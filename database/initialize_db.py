@@ -11,7 +11,7 @@ def create_tables():
     print("Checking database tables...")
 
     # --- TEAM MEMBER 4 (AUTH/LEAD): USERS TABLE ---
-    # [cite: 10] Schema from Page 5/10
+
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,16 +23,16 @@ def create_tables():
     """)
 
     # --- TEAM MEMBER 1: STUDENTS ---
-    # Paste your schema here...
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS students (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    level TEXT,
-    birthdate TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-""")
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS students (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        level TEXT,
+        birthdate TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    """)
 
     # --- TEAM MEMBER 2: INSTRUCTORS ---
     # Paste your schema here...
