@@ -37,8 +37,27 @@ def create_tables():
     # --- TEAM MEMBER 2: INSTRUCTORS ---
     # Paste your schema here...
 
-    # --- TEAM MEMBER 3: COURSES ---
-    # Paste your schema here...
+    # --- TEAM MEMBER 3: COURSES --- We need Instructors table first to be able to excute this (due to the forign key (instructor_id))
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS courses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        instructor_id INTEGER,
+        FOREIGN KEY (instructor_id) REFERENCES instructors(id)
+    );
+    """)
+    
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS enrollments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        course_id INTEGER NOT NULL,
+        date_enrolled TEXT,
+        FOREIGN KEY (student_id) REFERENCES students(id),
+        FOREIGN KEY (course_id) REFERENCES courses(id)
+    );
+    """)
 
     # --- TEAM MEMBER 5: ASSIGNMENTS ---
     # Paste your schema here...
