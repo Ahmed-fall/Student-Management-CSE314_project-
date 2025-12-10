@@ -60,38 +60,7 @@ def create_tables():
     """)
 
     # --- TEAM MEMBER 5: ASSIGNMENTS ---
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS assignments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        course_id INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT,
-        type TEXT NOT NULL, -- "quiz" or "project"
-        due_date TEXT,
-        FOREIGN KEY (course_id) REFERENCES courses(id)
-    );
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS submissions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        assignment_id INTEGER NOT NULL,
-        student_id INTEGER NOT NULL,
-        content TEXT,
-        submitted_at TEXT,
-        FOREIGN KEY (assignment_id) REFERENCES assignments(id),
-        FOREIGN KEY (student_id) REFERENCES students(id)
-    );
-    """)
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS grades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        submission_id INTEGER NOT NULL,
-        grade_value REAL NOT NULL,
-        FOREIGN KEY (submission_id) REFERENCES submissions(id)
-    );
-    """)
+    # Paste your schema here...
 
     # --- TEAM MEMBER 6: ANNOUNCEMENTS ---
     # Paste your schema here...
