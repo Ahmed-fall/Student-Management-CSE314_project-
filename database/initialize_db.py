@@ -42,7 +42,7 @@ def create_tables():
         user_id INTEGER NOT NULL,
         specialty TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id)
-    );ss
+    );
     """)
     # --- TEAM MEMBER 3: COURSES --- We need Instructors table first to be able to excute this (due to the forign key (instructor_id))
     cursor.execute("""
