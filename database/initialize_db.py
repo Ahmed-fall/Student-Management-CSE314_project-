@@ -15,8 +15,10 @@ def create_tables():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
+        gender TEXT,
         password TEXT NOT NULL,
         role TEXT NOT NULL -- "student", "instructor", "admin"
     );
@@ -41,6 +43,7 @@ def create_tables():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         specialty TEXT,
+        department TEXT
         FOREIGN KEY (user_id) REFERENCES users(id)
     );
     """)
@@ -48,8 +51,10 @@ def create_tables():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS courses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT NOT NULL UNIQUE,
         name TEXT NOT NULL,
         description TEXT,
+        credits INTEGER NOT NULL DEFAULT 3,
         instructor_id INTEGER,
         FOREIGN KEY (instructor_id) REFERENCES instructors(id)
     );
@@ -75,6 +80,7 @@ def create_tables():
         description TEXT,
         type TEXT NOT NULL, -- "quiz" or "project"
         due_date TEXT,
+        max_score INTEGER NOT NULL DEFAULT 100,
         FOREIGN KEY (course_id) REFERENCES courses(id)
     );
     """)
@@ -96,12 +102,34 @@ def create_tables():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         submission_id INTEGER NOT NULL,
         grade_value REAL NOT NULL,
+        feedback TEXT,
         FOREIGN KEY (submission_id) REFERENCES submissions(id)
     );
     """)
 
     # --- TEAM MEMBER 6: ANNOUNCEMENTS ---
-    # Paste your schema here...
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        course_id INTEGER, -- NULL means global announcement
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        created_at TEXT,
+        FOREIGN KEY (course_id) REFERENCES courses(id)
+    );
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        announcement_id INTEGER NOT NULL,
+        read_flag INTEGER DEFAULT 0,
+        sent_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (announcement_id) REFERENCES announcements(id)
+    );
+    """)
 
     conn.commit()
     conn.close()
