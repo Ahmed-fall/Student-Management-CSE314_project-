@@ -10,7 +10,7 @@ def create_tables():
     
     print("Checking database tables...")
 
-    # --- TEAM MEMBER 4 (AUTH/LEAD): USERS TABLE ---
+    # --- TEAM MEMBER 4 (AUTH): USERS TABLE ---
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
