@@ -98,3 +98,17 @@ class Grade(BaseModel):
             "grade_value": self._grade_value,
             "feedback": self._feedback
         }
+
+    @staticmethod
+    def from_row(row):
+        """
+        Factory method to create a Grade from a database row.
+        """
+        if not row:
+            return None
+        return Grade(
+            id=row['id'],
+            submission_id=row['submission_id'],
+            grade_value=row['grade_value'],
+            feedback=row['feedback']
+        )
