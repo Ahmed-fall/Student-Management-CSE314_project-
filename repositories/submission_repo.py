@@ -1,12 +1,13 @@
 from core.base_repository import BaseRepository
-from database.db_connection import get_db_connection
+from models.submission import Submission
 
 class SubmissionRepository(BaseRepository):
     """
     Handles strict Database interactions for the 'submissions' table.
     
     Implementation details:
-    - Connection Safety: Uses 'with get_db_connection()' for automatic cleanup.
+    - Connection Safety: Uses 'with self.get_connection()' (Inherited from Base).
+    - Data Safety: Returns strict 'Submission' objects via 'from_row', not raw tuples.
     - Security: Uses parameterized queries (?) to prevent SQL Injection.
     """
 
@@ -18,26 +19,26 @@ class SubmissionRepository(BaseRepository):
         INSERT INTO submissions (assignment_id, student_id, content, submitted_at)
         VALUES (?, ?, ?, ?)
         """
-        with get_db_connection() as conn:
+        with self.get_connection() as conn:
             conn.execute(sql, (assignment_id, student_id, content, submitted_at))
 
     def get_all(self):
         """
-        Fetches all submissions.
+        Fetches all submissions and converts them to Submission objects.
         """
         sql = "SELECT * FROM submissions"
-        with get_db_connection() as conn:
+        with self.get_connection() as conn:
             cursor = conn.execute(sql)
-            return cursor.fetchall()
+            return [Submission.from_row(row) for row in cursor.fetchall()]
 
     def get_by_id(self, id: int):
         """
         Fetches a single submission by unique ID.
         """
         sql = "SELECT * FROM submissions WHERE id = ?"
-        with get_db_connection() as conn:
+        with self.get_connection() as conn:
             cursor = conn.execute(sql, (id,))
-            return cursor.fetchone()
+            return Submission.from_row(cursor.fetchone())
 
     def get_by_assignment_id(self, assignment_id: int):
         """
@@ -45,9 +46,9 @@ class SubmissionRepository(BaseRepository):
         Useful for teachers grading a specific task.
         """
         sql = "SELECT * FROM submissions WHERE assignment_id = ?"
-        with get_db_connection() as conn:
+        with self.get_connection() as conn:
             cursor = conn.execute(sql, (assignment_id,))
-            return cursor.fetchall()
+            return [Submission.from_row(row) for row in cursor.fetchall()]
 
     def get_by_student_id(self, student_id: int):
         """
@@ -55,9 +56,9 @@ class SubmissionRepository(BaseRepository):
         Useful for student history views.
         """
         sql = "SELECT * FROM submissions WHERE student_id = ?"
-        with get_db_connection() as conn:
+        with self.get_connection() as conn:
             cursor = conn.execute(sql, (student_id,))
-            return cursor.fetchall()
+            return [Submission.from_row(row) for row in cursor.fetchall()]
 
     def update(self, id: int, content: str, submitted_at: str):
         """
@@ -69,7 +70,7 @@ class SubmissionRepository(BaseRepository):
         SET content = ?, submitted_at = ?
         WHERE id = ?
         """
-        with get_db_connection() as conn:
+        with self.get_connection() as conn:
             conn.execute(sql, (content, submitted_at, id))
 
     def delete(self, id: int):
@@ -77,5 +78,5 @@ class SubmissionRepository(BaseRepository):
         Hard deletes a submission by ID.
         """
         sql = "DELETE FROM submissions WHERE id = ?"
-        with get_db_connection() as conn:
+        with self.get_connection() as conn:
             conn.execute(sql, (id,))
