@@ -23,6 +23,14 @@ class BaseRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_id(self, id):
+        pass
+
+    @abstractmethod
+    def update(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
     def delete(self, id):
         
         pass

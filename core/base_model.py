@@ -12,6 +12,15 @@ class BaseModel(ABC):
         Used for populating UI tables (TreeViews).
         """
         pass
+    
+    @staticmethod
+    @abstractmethod
+    def from_row(row):
+        """
+        REQUIRED: Factory method to create an object from a database row.
+        Ensures all models have a standard way to load data.
+        """
+        pass
 
     def __repr__(self):
         """
