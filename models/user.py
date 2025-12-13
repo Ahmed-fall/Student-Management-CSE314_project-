@@ -37,6 +37,10 @@ class User(BaseModel):
     @property
     def role(self):
         return self._role
+    
+    @property
+    def password_hash(self):
+        return self._password_hash
 
     @id.setter
     def id(self, value):
@@ -88,11 +92,11 @@ class User(BaseModel):
     def to_dict(self):
         return {
             'id': self._id,
-            'Username': self._username,
-            'Name': self._name,
-            'Email': self._email,
-            'Gender': self._gender,
-            'Role': self._role
+            'username': self._username,
+            'name': self._name,
+            'email': self._email,
+            'gender': self._gender,
+            'role': self._role
         }
 
     @staticmethod
