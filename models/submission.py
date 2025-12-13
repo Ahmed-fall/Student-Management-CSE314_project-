@@ -110,3 +110,15 @@ class Submission(BaseModel):
             "content": self._content,
             "submitted_at": self._submitted_at
         }
+    
+    @staticmethod
+    def from_row(row):
+        if not row:
+            return None
+        return Submission(
+            id=row['id'],
+            assignment_id=row['assignment_id'],
+            student_id=row['student_id'],
+            content=row['content'],
+            submitted_at=row['submitted_at']
+        )

@@ -148,3 +148,23 @@ class Assignment(BaseModel):
             "due_date": self._due_date,
             "max_score": self._max_score
         }
+
+    @staticmethod
+    def from_row(row):
+        """
+        Factory method to create an Assignment from a database row.
+        Safe against optional fields and missing data.
+        """
+        if not row:
+            return None
+        
+        # Calls the constructor, which triggers all validation logic above.
+        return Assignment(
+            id=row['id'],
+            course_id=row['course_id'],
+            title=row['title'],
+            description=row['description'],
+            type=row['type'],
+            due_date=row['due_date'],
+            max_score=row['max_score']
+        )
