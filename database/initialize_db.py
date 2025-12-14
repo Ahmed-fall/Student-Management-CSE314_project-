@@ -68,7 +68,7 @@ def create_tables():
         student_id INTEGER NOT NULL,
         course_id INTEGER NOT NULL,
         date_enrolled TEXT,
-        status TEXT NOT NULL DEFAULT 'enrolled
+        status TEXT NOT NULL DEFAULT 'enrolled',
         FOREIGN KEY (student_id) REFERENCES students(id),
         FOREIGN KEY (course_id) REFERENCES courses(id)
     );

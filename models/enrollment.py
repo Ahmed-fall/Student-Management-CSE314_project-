@@ -1,5 +1,4 @@
 from core.base_model import BaseModel
-from datetime import date
 
 class Enrollment(BaseModel):
     """
@@ -87,11 +86,11 @@ class Enrollment(BaseModel):
             self._date_enrolled = None
             return
 
-        if isinstance(value, date):
-            self._date_enrolled = value
+        if isinstance(value, str):
+            self._date_enrolled = value.strip()
             return
 
-        raise TypeError("date_enrolled must be a datetime.date object or None.")
+        raise TypeError("date_enrolled must be a string or None.")
 
 
     @status.setter
@@ -118,7 +117,7 @@ class Enrollment(BaseModel):
             "id": self._id,
             "student_id": self._student_id,
             "course_id": self._course_id,
-            "date_enrolled": self._date_enrolled.isoformat() if self._date_enrolled else None,
+            "date_enrolled": self._date_enrolled,
             "status": self._status
         }
 

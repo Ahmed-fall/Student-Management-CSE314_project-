@@ -1,6 +1,5 @@
 from core.base_repository import BaseRepository
 from models.enrollment import Enrollment
-from datetime import datetime
 
 class EnrollmentRepository(BaseRepository):
     """
@@ -17,9 +16,7 @@ class EnrollmentRepository(BaseRepository):
         Inserts a new enrollment into the database.
         If date_enrolled is None, uses current date.
         """
-        if date_enrolled is None:
-            date_enrolled = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+        
         sql = """
         INSERT INTO enrollments (student_id, course_id, date_enrolled, status)
         VALUES (?, ?, ?, ?)
