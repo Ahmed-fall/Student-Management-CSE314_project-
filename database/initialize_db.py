@@ -55,6 +55,8 @@ def create_tables():
         name TEXT NOT NULL,
         description TEXT,
         credits INTEGER NOT NULL DEFAULT 3,
+        semester TEXT NOT NULL,
+        max_students INTEGER NOT NULL DEFAULT 30,
         instructor_id INTEGER,
         FOREIGN KEY (instructor_id) REFERENCES instructors(id)
     );
@@ -66,6 +68,7 @@ def create_tables():
         student_id INTEGER NOT NULL,
         course_id INTEGER NOT NULL,
         date_enrolled TEXT,
+        status TEXT NOT NULL DEFAULT 'enrolled',
         FOREIGN KEY (student_id) REFERENCES students(id),
         FOREIGN KEY (course_id) REFERENCES courses(id)
     );
