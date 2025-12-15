@@ -1,4 +1,4 @@
-from .base_repo import BaseRepository
+from core.base_repository import BaseRepository
 from ..models.instructor import Instructor 
 
 class InstructorRepository(BaseRepository):
