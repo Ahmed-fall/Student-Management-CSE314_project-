@@ -10,6 +10,7 @@ class User(BaseModel):
     
     # 🌟 CORRECTION: ALLOWED_ROLES defined as a Class Constant 
     ALLOWED_ROLES = {"student", "instructor", "admin"} 
+    ALLOWED_GENDERS = {"male", "female", "engineer"} 
     
     def __init__(self, id, username, name, email, gender, role, password_hash=None):
         """Initializes and VALIDATES all data immediately using setters."""
@@ -88,9 +89,9 @@ class User(BaseModel):
 
     @gender.setter
     def gender(self, value):
-        if value is not None and not isinstance(value, str):
-            raise TypeError("Gender must be a string or None.")
-        self._gender = value.strip().capitalize() if value else None
+        if not isinstance(value, str) or value.lower() not in User.ALLOWED_GENDERS:
+            raise ValueError(f"Invalid gender: {value}. Must be one of {User.ALLOWED_GENDERS}.")
+        self._gender = value.lower()
 
     @role.setter
     def role(self, value):
