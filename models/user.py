@@ -1,10 +1,18 @@
+# models/user.py
 from core.base_model import BaseModel 
 
 class User(BaseModel): 
-
+    """
+    Base class for all users, inheriting from BaseModel.
+    Implements Encapsulation using properties/setters and contains base validation.
+    Matches schema: id, username, name, email, gender, password, role.
+    """
+    
+    # 🌟 CORRECTION: ALLOWED_ROLES defined as a Class Constant 
+    ALLOWED_ROLES = {"student", "instructor", "admin"} 
     
     def __init__(self, id, username, name, email, gender, role, password_hash=None):
-
+        """Initializes and VALIDATES all data immediately using setters."""
         self.id = id
         self._password_hash = password_hash 
         self.username = username
@@ -13,6 +21,7 @@ class User(BaseModel):
         self.gender = gender
         self.role = role
 
+    # --- Getters (@property) for Public Access ---
     
     @property
     def id(self):
@@ -40,7 +49,9 @@ class User(BaseModel):
     
     @property
     def password_hash(self):
-        return self._password_hash
+        return self._password_hash # Note: This getter is present in the provided source
+
+    # --- Setters (Validation Logic) ---
 
     @id.setter
     def id(self, value):
@@ -83,13 +94,14 @@ class User(BaseModel):
 
     @role.setter
     def role(self, value):
-        ALLOWED_ROLES = {"student", "instructor", "admin"}
-        if not isinstance(value, str) or value.lower() not in ALLOWED_ROLES:
-            raise ValueError(f"Invalid role: {value}. Must be one of {ALLOWED_ROLES}.")
+        if not isinstance(value, str) or value.lower() not in User.ALLOWED_ROLES:
+            raise ValueError(f"Invalid role: {value}. Must be one of {User.ALLOWED_ROLES}.")
         self._role = value.lower()
 
+    # --- Abstraction (Required by BaseModel) ---
 
     def to_dict(self):
+        """Returns dict for UI display with consistent, lowercase keys."""
         return {
             'id': self._id,
             'username': self._username,
@@ -101,6 +113,7 @@ class User(BaseModel):
 
     @staticmethod
     def from_row(row):
+        """Factory method to create User from a database Row object."""
         if not row:
             return None
         
