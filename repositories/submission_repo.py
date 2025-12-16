@@ -11,7 +11,7 @@ class SubmissionRepository(BaseRepository):
     - Security: Uses parameterized queries (?) to prevent SQL Injection.
     """
 
-    def create(self, assignment_id: int, student_id: int, content: str, submitted_at: str):
+    def create(self, item: Submission) -> Submission:
         """
         Inserts a new submission into the database.
         """
@@ -19,8 +19,12 @@ class SubmissionRepository(BaseRepository):
         INSERT INTO submissions (assignment_id, student_id, content, submitted_at)
         VALUES (?, ?, ?, ?)
         """
+        values = (item.assignment_id, item.student_id, item.content, item.submitted_at)
+
         with self.get_connection() as conn:
-            conn.execute(sql, (assignment_id, student_id, content, submitted_at))
+            cursor = conn.execute(sql, values)
+            item.id = cursor.lastrowid
+            return item
 
     def get_all(self):
         """
@@ -60,7 +64,7 @@ class SubmissionRepository(BaseRepository):
             cursor = conn.execute(sql, (student_id,))
             return [Submission.from_row(row) for row in cursor.fetchall()]
 
-    def update(self, id: int, content: str, submitted_at: str):
+    def update(self, item: Submission):
         """
         Updates an existing submission's content and timestamp.
         Note: We do not update assignment_id or student_id as ownership shouldn't change.
@@ -70,8 +74,9 @@ class SubmissionRepository(BaseRepository):
         SET content = ?, submitted_at = ?
         WHERE id = ?
         """
+        values = (item.content, item.submitted_at, item.id)
         with self.get_connection() as conn:
-            conn.execute(sql, (content, submitted_at, id))
+            conn.execute(sql, values)
 
     def delete(self, id: int):
         """

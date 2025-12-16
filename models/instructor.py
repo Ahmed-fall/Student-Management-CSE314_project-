@@ -6,8 +6,8 @@ class Instructor(User):
     Holds instructor-specific profile data from the 'instructors' table.
     """
     
-    def __init__(self, id, username, name, email, gender, role, password_hash, 
-                 instructor_profile_id, user_id_fk, department):
+    def __init__(self, id, username, name, email, gender, role, password_hash, department,
+                 instructor_profile_id=None, user_id_fk=None):
         
         # 1. Inheritance: Call the parent User constructor
         super().__init__(id, username, name, email, gender, role, password_hash)
@@ -41,7 +41,7 @@ class Instructor(User):
         
     @user_id_fk.setter
     def user_id_fk(self, value):
-        if not isinstance(value, int):
+        if value is not None and not isinstance(value, int):
              raise TypeError("User Foreign Key must be an integer.")
         self._user_id_fk = value
 
@@ -55,11 +55,7 @@ class Instructor(User):
     # Polymorphism & Abstraction (Overrides and Required Methods)
     # ---------------------------------------------------------
 
-    def display_info(self):
-        """Overrides the parent method to include instructor-specific details."""
-        base_info = super().display_info()
-        return (f"{base_info} | Profile ID: {self.instructor_profile_id} | "
-                f"Department: {self.department}")
+
 
     def to_dict(self):
         """REQUIRED: Combines User data and Instructor data for UI display."""
@@ -79,10 +75,16 @@ class Instructor(User):
             return None
         
         return Instructor(
-            # User attributes (from users table)
-            id=row['id'], username=row['username'], name=row['name'], email=row['email'], 
-            gender=row['gender'], role=row['role'], password_hash=row['password'],
-            # Instructor profile attributes (from instructors table)
-            instructor_profile_id=row.get('instructor_profile_id', row['user_id']), 
-            user_id_fk=row['user_id'], department=row['department']
+            # User Data
+            id=row['id'], 
+            username=row['username'], 
+            name=row['name'], 
+            email=row['email'], 
+            gender=row['gender'], 
+            role=row['role'], 
+            password_hash=row['password'],
+            # Instructor Data
+            department=row['department'],
+            instructor_profile_id=row['instructor_profile_id'], # Ensure SQL aliases this!
+            user_id_fk=row['user_id']
         )

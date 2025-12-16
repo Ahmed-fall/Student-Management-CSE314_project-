@@ -30,8 +30,9 @@ def create_tables():
     CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
-        level TEXT,
+        level INTEGER,
         birthdate TEXT,
+        major TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id)
     );
     """)
@@ -42,7 +43,6 @@ def create_tables():
     CREATE TABLE IF NOT EXISTS instructors (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
-        specialty TEXT,
         department TEXT ,
         FOREIGN KEY (user_id) REFERENCES users(id)
     );

@@ -11,7 +11,7 @@ class CourseRepository(BaseRepository):
     - Security: Parameterized queries to prevent SQL injection.
     """
 
-    def create(self, code: str, name: str, description: str, credits: int, semester: str, max_students: int, instructor_id: int):
+    def create(self, item: Course) -> Course:
         """
         Inserts a new course into the database.
         """
@@ -19,9 +19,14 @@ class CourseRepository(BaseRepository):
         INSERT INTO courses (code, name, description, credits, semester, max_students, instructor_id)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """
+        values = (
+            item.code, item.name, item.description, 
+            item.credits, item.semester, item.max_students, item.instructor_id
+        )
         with self.get_connection() as conn:
-            conn.execute(sql, (code, name, description, credits, semester, max_students, instructor_id))
-
+            cursor = conn.execute(sql, values)
+            item.id = cursor.lastrowid 
+            return item 
     def get_all(self):
         """
         Fetches all courses.
@@ -49,7 +54,7 @@ class CourseRepository(BaseRepository):
             cursor = conn.execute(sql, (instructor_id,))
             return [Course.from_row(row) for row in cursor.fetchall()]
 
-    def update(self, id: int, code: str, name: str, description: str, credits: int, semester: str, max_students: int, instructor_id: int):
+    def update(self, item: Course):
         """
         Updates an existing course's details.
         """
@@ -58,8 +63,12 @@ class CourseRepository(BaseRepository):
         SET code = ?, name = ?, description = ?, credits = ?, semester = ?, max_students = ?, instructor_id = ?
         WHERE id = ?
         """
+        values = (
+            item.code, item.name, item.description, item.credits, 
+            item.semester, item.max_students, item.instructor_id, item.id
+        )
         with self.get_connection() as conn:
-            conn.execute(sql, (code, name, description, credits, semester, max_students, instructor_id, id))
+            conn.execute(sql, values)
 
     def delete(self, id: int):
         """

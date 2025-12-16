@@ -1,5 +1,5 @@
 from core.base_repository import BaseRepository
-from ..models.user import User 
+from models.user import User 
 
 class UserRepository(BaseRepository):
     
@@ -7,79 +7,64 @@ class UserRepository(BaseRepository):
         super().__init__()
         self.table_name = 'users'
 
-    def create(self, username, name, email, gender, password_hash, role):
-        query = f"""
+    def create(self, item: User) -> User:
+        sql = """
             INSERT INTO {self.table_name} 
             (username, name, email, gender, password, role) 
             VALUES (?, ?, ?, ?, ?, ?)
         """
-        params = (username, name, email, gender, password_hash, role)
+        values = (item.username, item.name, item.email, item.gender, item.password_hash, item.role)
         
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.lastrowid 
+            cursor = conn.execute(sql, values)
+            item.id = cursor.lastrowid 
+            return item
 
-    def get_by_username(self, username):
-        query = f"SELECT id, username, name, email, gender, password, role FROM {self.table_name} WHERE username = ?"
-        
+    def get_by_username(self, username: str) -> User:
+        sql = "SELECT * FROM users WHERE username = ?"
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (username,))
-            return cursor.fetchone()
+            cursor = conn.execute(sql, (username,))
+            return User.from_row(cursor.fetchone())
 
     def get_by_email(self, email):
-        query = f"SELECT id, username, name, email, gender, password, role FROM {self.table_name} WHERE email = ?"
+        sql = "SELECT * FROM users WHERE email = ?"
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, (email,))
-            return cursor.fetchone()
+            cursor = conn.execute(sql, (email,))
+            return User.from_row(cursor.fetchone())
 
     def get_by_id(self, user_id):
-        query = f"SELECT id, username, name, email, gender, password, role FROM {self.table_name} WHERE id = ?"
-        
+        sql = "SELECT * FROM users WHERE id = ?"        
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (user_id,))
-            row = cursor.fetchone()
-            return User.from_row(row)
+            cursor = conn.execute(sql, (id,))
+            return User.from_row(cursor.fetchone())
 
-    def update(self, user_id, updates):
-        if not updates:
-            return 0
+    def update(self, item: User):
         
-        set_clauses = [f"{key} = ?" for key in updates.keys()]
-        query = f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE id = ?"
-        params = list(updates.values()) + [user_id]
-        
+        sql = """
+        UPDATE users 
+        SET username = ?, name = ?, email = ?, gender = ?, role = ?
+        WHERE id = ?
+        """
+        values = (item.username, item.name, item.email, item.gender, item.role, item.id)
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.rowcount
+            conn.execute(sql, values)
 
-    def update_password(self, user_id, password_hash):
-        query = f"UPDATE {self.table_name} SET password = ? WHERE id = ?"
-        
+    def update_password(self, user_id, new_password_hash):
+       
+        sql = "UPDATE users SET password = ? WHERE id = ?"
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (password_hash, user_id))
-            return cursor.rowcount
+            conn.execute(sql, (new_password_hash, user_id))
 
-    def delete(self, user_id):
-        query = f"DELETE FROM {self.table_name} WHERE id = ?"
+    def delete(self, id: int):
+        sql = "DELETE FROM users WHERE id = ?"
         
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (user_id,))
-            return cursor.rowcount
+            conn.execute(sql, (id,))
 
     def get_all(self):
-        query = f"SELECT id, username, name, email, gender, password, role FROM {self.table_name}"
-        
+        sql = "SELECT * FROM users"        
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            
-            return [User.from_row(row) for row in rows]
+            cursor = conn.execute(sql)
+            return [User.from_row(row) for row in cursor.fetchall()]

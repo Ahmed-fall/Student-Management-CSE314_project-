@@ -11,7 +11,7 @@ class GradeRepository(BaseRepository):
     - Security: Uses parameterized queries (?) to prevent SQL Injection.
     """
 
-    def create(self, submission_id: int, grade_value: float, feedback: str):
+    def create(self, item: Grade) -> Grade:
         """
         Inserts a new grade into the database.
         """
@@ -19,8 +19,12 @@ class GradeRepository(BaseRepository):
         INSERT INTO grades (submission_id, grade_value, feedback)
         VALUES (?, ?, ?)
         """
+        values = (item.submission_id, item.grade_value, item.feedback)
+
         with self.get_connection() as conn:
-            conn.execute(sql, (submission_id, grade_value, feedback))
+            cursor = conn.execute(sql, values)
+            item.id = cursor.lastrowid
+            return item
 
     def get_all(self):
         """
@@ -50,7 +54,7 @@ class GradeRepository(BaseRepository):
             cursor = conn.execute(sql, (submission_id,))
             return Grade.from_row(cursor.fetchone())
 
-    def update(self, id: int, grade_value: float, feedback: str):
+    def update(self, item: Grade):
         """
         Updates an existing grade's value and feedback.
         """
@@ -59,8 +63,9 @@ class GradeRepository(BaseRepository):
         SET grade_value = ?, feedback = ?
         WHERE id = ?
         """
+        values = (item.grade_value, item.feedback, item.id)
         with self.get_connection() as conn:
-            conn.execute(sql, (grade_value, feedback, id))
+            conn.execute(sql, values)
 
     def delete(self, id: int):
         """

@@ -11,7 +11,7 @@ class AssignmentRepository(BaseRepository):
     - Security: Uses parameterized queries (?) to prevent SQL Injection.
     """
 
-    def create(self, course_id: int, title: str, description: str, type: str, due_date: str, max_score: int):
+    def create(self, item: Assignment) -> Assignment:
         """
         Inserts a new assignment into the database.
         """
@@ -19,8 +19,12 @@ class AssignmentRepository(BaseRepository):
         INSERT INTO assignments (course_id, title, description, type, due_date, max_score)
         VALUES (?, ?, ?, ?, ?, ?)
         """
+        # We extract values from the Validated Object, not raw arguments
+        values = (item.course_id, item.title, item.description, item.type, item.due_date, item.max_score)
         with self.get_connection() as conn:
-            conn.execute(sql, (course_id, title, description, type, due_date, max_score))
+            cursor = conn.execute(sql, values)
+            item.id = cursor.lastrowid
+            return item
 
     def get_all(self):
         """
@@ -49,7 +53,7 @@ class AssignmentRepository(BaseRepository):
             cursor = conn.execute(sql, (course_id,))
             return [Assignment.from_row(row) for row in cursor.fetchall()]
 
-    def update(self, id: int, title: str, description: str, type: str, due_date: str, max_score: int):
+    def update(self, item: Assignment):
         """
         Updates an existing assignment's details.
         """
@@ -58,8 +62,9 @@ class AssignmentRepository(BaseRepository):
         SET title = ?, description = ?, type = ?, due_date = ?, max_score = ?
         WHERE id = ?
         """
+        values = (item.title, item.description, item.type, item.due_date, item.max_score, item.id)
         with self.get_connection() as conn:
-            conn.execute(sql, (title, description, type, due_date, max_score, id))
+            conn.execute(sql, values)
 
     def delete(self, id: int):
         """

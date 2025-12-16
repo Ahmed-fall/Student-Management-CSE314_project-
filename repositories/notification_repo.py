@@ -1,8 +1,5 @@
-# repositories/notification_repo.py
-
 from core.base_repository import BaseRepository
 from models.notification import Notification
-from datetime import datetime
 
 class NotificationRepository(BaseRepository):
     """
@@ -14,25 +11,20 @@ class NotificationRepository(BaseRepository):
     - Security: Uses parameterized queries (?) to prevent SQL Injection.
     """
 
-    def create(self, user_id, announcement_id, read_flag=0, sent_at=None):
+    def create(self, item: Notification) -> Notification:
         """
         Inserts a new notification into the database.
         """
-        sent_at = sent_at or datetime.now().isoformat()
+        
         sql = """
         INSERT INTO notifications (user_id, announcement_id, read_flag, sent_at)
         VALUES (?, ?, ?, ?)
         """
+        values = (item.user_id, item.announcement_id, item.read_flag, item.sent_at)
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, (user_id, announcement_id, read_flag, sent_at))
-            notification_id = cursor.lastrowid
-            return Notification(
-                id=notification_id,
-                user_id=user_id,
-                announcement_id=announcement_id,
-                read_flag=read_flag,
-                sent_at=sent_at
-            )
+            cursor = conn.execute(sql, values)
+            item.id = cursor.lastrowid
+            return item
 
     def get_all(self):
         """
@@ -73,13 +65,14 @@ class NotificationRepository(BaseRepository):
             cursor = conn.execute(sql, (announcement_id,))
             return [Notification.from_row(row) for row in cursor.fetchall()]
 
-    def update(self, id, read_flag=None, sent_at=None):
+    def update(self, item: Notification):
         """
-        Updates an existing notification's read_flag or sent_at.
+        Updates an existing notification's read_flag
         """
-        sql = "UPDATE notifications SET read_flag = ?, sent_at = ? WHERE id = ?"
+        sql = "UPDATE notifications SET read_flag = ? WHERE id = ?"
+        values = (item.read_flag, item.id)
         with self.get_connection() as conn:
-            conn.execute(sql, (read_flag, sent_at, id))
+            conn.execute(sql, values)
 
     def delete(self, id):
         """

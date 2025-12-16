@@ -11,7 +11,7 @@ class EnrollmentRepository(BaseRepository):
     - Security: Uses parameterized queries (?) to prevent SQL Injection.
     """
 
-    def create(self, student_id: int, course_id: int, date_enrolled: str = None, status: str = "enrolled"):
+    def create(self, item: Enrollment) -> Enrollment:
         """
         Inserts a new enrollment into the database.
         If date_enrolled is None, uses current date.
@@ -21,8 +21,11 @@ class EnrollmentRepository(BaseRepository):
         INSERT INTO enrollments (student_id, course_id, date_enrolled, status)
         VALUES (?, ?, ?, ?)
         """
+        values = (item.student_id, item.course_id, item.date_enrolled, item.status)
         with self.get_connection() as conn:
-            conn.execute(sql, (student_id, course_id, date_enrolled, status))
+            cursor = conn.execute(sql, values)
+            item.id = cursor.lastrowid
+            return item
 
     def get_all(self):
         """
@@ -60,13 +63,14 @@ class EnrollmentRepository(BaseRepository):
             cursor = conn.execute(sql, (course_id,))
             return [Enrollment.from_row(row) for row in cursor.fetchall()]
 
-    def update(self, id: int, status: str):
+    def update(self, item: Enrollment):
         """
         Update an enrollment's status.
         """
         sql = "UPDATE enrollments SET status = ? WHERE id = ?"
+        values = (item.status, item.date_enrolled, item.id)
         with self.get_connection() as conn:
-            conn.execute(sql, (status, id))
+            conn.execute(sql, values)
 
     def delete(self, id: int):
         """

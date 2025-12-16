@@ -1,83 +1,91 @@
 from core.base_repository import BaseRepository
-from ..models.instructor import Instructor 
+from models.instructor import Instructor 
 
 class InstructorRepository(BaseRepository):
     
-    def __init__(self):
-        super().__init__()
-        self.table_name = 'instructors'
+    """
+    Handles interactions for Instructors. 
+    Manages the complexities of the 'users' AND 'instructors' tables.
+    """
 
-    def create(self, user_id: int, department: str) -> int:
-        """Inserts a new instructor profile record, returning the new profile ID."""
-        query = f"""
-            INSERT INTO {self.table_name} 
-            (user_id, department) 
-            VALUES (?, ?)
+    def create(self, item: Instructor) -> Instructor:
         """
-        params = (user_id, department)
+        Saves the Instructor atomically.
+        1. Inserts into 'users'.
+        2. Gets the new user_id.
+        3. Inserts into 'instructors' using that ID.
+        """
+        sql_user = """
+        INSERT INTO users (username, name, email, gender, password, role) 
+        VALUES (?, ?, ?, ?, ?, ?)
+        """
+        sql_instructor = """
+        INSERT INTO instructors (user_id, department) 
+        VALUES (?, ?)
+        """
+        
+        # User Data
+        user_values = (item.username, item.name, item.email, item.gender, item.password_hash, item.role)
         
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.lastrowid 
+            # 1. Save User Part
+            cursor = conn.execute(sql_user, user_values)
+            new_user_id = cursor.lastrowid
+            
+            # Update Object with ID
+            item.id = new_user_id
+            item.user_id_fk = new_user_id
+            
+            # 2. Save Instructor Part
+            conn.execute(sql_instructor, (new_user_id, item.department))
+            
+            # (Optional: fetch the instructor_profile_id if needed, usually user_id is enough)
+            return item
 
-    def get_full_profile(self, user_id: int) -> Instructor:
+    def update(self, item: Instructor):
         """
-        Fetches the complete Instructor object by joining the users and instructors tables.
+        Updates BOTH the User details and Instructor details.
         """
-        query = f"""
-            SELECT 
-                u.id, u.username, u.name, u.email, u.gender, u.password, u.role,
-                i.id AS instructor_profile_id, i.user_id, i.department
+        sql_user = """
+        UPDATE users SET username=?, name=?, email=?, gender=?, role=? WHERE id=?
+        """
+        sql_instructor = """
+        UPDATE instructors SET department=? WHERE user_id=?
+        """
+        
+        user_values = (item.username, item.name, item.email, item.gender, item.role, item.id)
+        instructor_values = (item.department, item.id)
+        
+        with self.get_connection() as conn:
+            conn.execute(sql_user, user_values)
+            conn.execute(sql_instructor, instructor_values)
+
+    def get_all(self):
+        # We JOIN to get the full object
+        sql = """
+            SELECT u.*, i.id as instructor_profile_id, i.department 
             FROM users u
-            INNER JOIN {self.table_name} i ON u.id = i.user_id
+            JOIN instructors i ON u.id = i.user_id
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql)
+            return [Instructor.from_row(row) for row in cursor.fetchall()]
+
+    def get_by_id(self, id: int):
+        sql = """
+            SELECT u.*, i.id as instructor_profile_id, i.department 
+            FROM users u
+            JOIN instructors i ON u.id = i.user_id
             WHERE u.id = ?
         """
-        
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (user_id,))
-            row = cursor.fetchone()
+            cursor = conn.execute(sql, (id,))
+            return Instructor.from_row(cursor.fetchone())
             
-            return Instructor.from_row(row)
-
-    def update(self, user_id: int, updates: dict) -> int:
-        """Updates specific fields for an instructor profile record, using the user_id FK."""
-        if not updates:
-            return 0
-        
-        set_clauses = [f"{key} = ?" for key in updates.keys()]
-        query = f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE user_id = ?"
-        params = list(updates.values()) + [user_id]
-        
+    def delete(self, id: int):
+        # If DB has CASCADE DELETE, deleting User deletes Instructor.
+        # Otherwise, delete Instructor first, then User.
+        # Assuming CASCADE is ON or we delete parent:
+        sql = "DELETE FROM users WHERE id = ?"
         with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.rowcount
-
-    def delete(self, user_id: int) -> int:
-        """Deletes the instructor profile record (not the base user record)."""
-        query = f"DELETE FROM {self.table_name} WHERE user_id = ?"
-        
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (user_id,))
-            return cursor.rowcount
-
-    def get_all(self) -> list[Instructor]:
-        """Fetches all Instructor objects."""
-        query = f"""
-            SELECT 
-                u.id, u.username, u.name, u.email, u.gender, u.password, u.role,
-                i.id AS instructor_profile_id, i.user_id, i.department
-            FROM users u
-            INNER JOIN {self.table_name} i ON u.id = i.user_id
-            WHERE u.role = 'instructor'
-        """
-        
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            
-            return [Instructor.from_row(row) for row in rows]
+            conn.execute(sql, (id,))
