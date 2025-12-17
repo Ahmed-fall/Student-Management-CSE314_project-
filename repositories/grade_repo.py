@@ -74,3 +74,21 @@ class GradeRepository(BaseRepository):
         sql = "DELETE FROM grades WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(sql, (id,))
+    
+    def get_student_total_score(self, student_id: int, course_id: int) -> float:
+        """
+        Calculates total points earned by a student in a specific course.
+        Joins Grades -> Submissions -> Assignments.
+        """
+        sql = """
+        SELECT SUM(g.grade_value)
+        FROM grades g
+        JOIN submissions s ON g.submission_id = s.id
+        JOIN assignments a ON s.assignment_id = a.id
+        WHERE s.student_id = ? AND a.course_id = ?
+        """
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (student_id, course_id))
+            result = cursor.fetchone()[0]
+            return result if result else 0.0
