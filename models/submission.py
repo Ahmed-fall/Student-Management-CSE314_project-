@@ -55,7 +55,7 @@ class Submission(BaseModel):
 
     @id.setter
     def id(self, value):
-        if not isinstance(value, int):
+        if value is not None and not isinstance(value, int):
             raise TypeError(f"Submission ID must be an integer, got {type(value).__name__}")
         self._id = value
 
