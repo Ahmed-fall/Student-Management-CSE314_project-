@@ -1,3 +1,4 @@
+from typing import List
 from core.base_repository import BaseRepository
 from models.notification import Notification
 
@@ -81,3 +82,63 @@ class NotificationRepository(BaseRepository):
         sql = "DELETE FROM notifications WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(sql, (id,))
+    
+    def create_many(self, items: List[Notification]):
+        """
+        OPTIMIZATION: Inserts multiple notifications in one transaction.
+        Prevents opening 50 separate database connections for one announcement.
+        """
+        sql = """
+        INSERT INTO notifications (user_id, announcement_id, read_flag, sent_at)
+        VALUES (?, ?, ?, ?)
+        """
+        # Convert list of Objects to list of Tuples for SQLite
+        values_list = [
+            (item.user_id, item.announcement_id, item.read_flag, item.sent_at) 
+            for item in items
+        ]
+        
+        with self.get_connection() as conn:
+            conn.executemany(sql, values_list)
+
+    def count_unread(self, user_id: int) -> int:
+        """Fast SQL count for the UI badge."""
+        sql = "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_flag = 0"
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (user_id,))
+            return cursor.fetchone()[0]
+
+    def delete_by_announcement(self, announcement_id: int):
+        """Cleanup: When an announcement is deleted, clear its notifications."""
+        sql = "DELETE FROM notifications WHERE announcement_id = ?"
+        with self.get_connection() as conn:
+            conn.execute(sql, (announcement_id,))
+
+    def get_dashboard_notifications(self, user_id: int):
+        """
+        Complex Query: Joins Notifications with Announcements.
+        Returns a dictionary for the UI, not a Model object.
+        """
+        sql = """
+        SELECT 
+            n.id as notification_id, 
+            n.read_flag, 
+            n.sent_at,
+            a.id as announcement_id,
+            a.title, 
+            a.message, 
+            a.course_id
+        FROM notifications n
+        JOIN announcements a ON n.announcement_id = a.id
+        WHERE n.user_id = ?
+        ORDER BY n.sent_at DESC
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (user_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def delete_old_read(self, cutoff_date: str):
+        """System Cleanup job."""
+        sql = "DELETE FROM notifications WHERE sent_at < ? AND read_flag = 1"
+        with self.get_connection() as conn:
+            conn.execute(sql, (cutoff_date,))
