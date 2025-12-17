@@ -85,3 +85,19 @@ class SubmissionRepository(BaseRepository):
         sql = "DELETE FROM submissions WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(sql, (id,))
+    
+    def get_by_student_and_course(self, student_id: int, course_id: int):
+        sql = """
+        SELECT s.* FROM submissions s
+        JOIN assignments a ON s.assignment_id = a.id
+        WHERE s.student_id = ? AND a.course_id = ?
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (student_id, course_id))
+            return [Submission.from_row(row) for row in cursor.fetchall()]
+    
+    def get_by_student_and_assignment(self, student_id: int, assignment_id: int):
+        sql = "SELECT * FROM submissions WHERE student_id = ? AND assignment_id = ?"
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (student_id, assignment_id))
+            return Submission.from_row(cursor.fetchone())

@@ -48,7 +48,7 @@ class AssignmentRepository(BaseRepository):
         """
         Fetches all assignments belonging to a specific course.
         """
-        sql = "SELECT * FROM assignments WHERE course_id = ?"
+        sql = "SELECT * FROM assignments WHERE course_id = ? ORDER BY due_date ASC"
         with self.get_connection() as conn:
             cursor = conn.execute(sql, (course_id,))
             return [Assignment.from_row(row) for row in cursor.fetchall()]
@@ -73,3 +73,15 @@ class AssignmentRepository(BaseRepository):
         sql = "DELETE FROM assignments WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(sql, (id,))
+    
+    def get_course_max_score(self, course_id: int) -> float:
+        """
+        Calculates the total possible points for a course (Sum of all assignments).
+        """
+        sql = "SELECT SUM(max_score) FROM assignments WHERE course_id = ?"
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (course_id,))
+            result = cursor.fetchone()[0]
+            # If result is None (no assignments), return 0.0
+            return result if result else 0.0

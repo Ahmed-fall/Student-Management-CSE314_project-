@@ -68,7 +68,7 @@ class EnrollmentRepository(BaseRepository):
         Update an enrollment's status.
         """
         sql = "UPDATE enrollments SET status = ? WHERE id = ?"
-        values = (item.status, item.date_enrolled, item.id)
+        values = (item.status, item.id)
         with self.get_connection() as conn:
             conn.execute(sql, values)
 
@@ -79,3 +79,10 @@ class EnrollmentRepository(BaseRepository):
         sql = "DELETE FROM enrollments WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(sql, (id,))
+
+    def is_enrolled(self, student_id: int, course_id: int) -> bool:
+        sql = "SELECT 1 FROM enrollments WHERE student_id = ? AND course_id = ? AND status = 'enrolled'"
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (student_id, course_id))
+            return cursor.fetchone() is not None
+    
