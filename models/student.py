@@ -9,7 +9,8 @@ class Student(User):
         self,
         id, username, name, email, gender, password_hash,
         level, birthdate, major,
-        user_id=None # Made Optional for creation phase
+        user_id=None, # Made Optional for creation phase
+        student_profile_id=None
     ):
         # 1. Initialize Parent
         super().__init__(
@@ -27,6 +28,7 @@ class Student(User):
         self.level = level
         self.birthdate = birthdate
         self.major = major
+        self.student_profile_id = student_profile_id
 
     # --- Getters ---
     @property
@@ -40,6 +42,9 @@ class Student(User):
 
     @property
     def major(self): return self._major
+
+    @property
+    def student_profile_id(self): return self._student_profile_id
 
     # --- Setters ---
     @user_id.setter
@@ -65,6 +70,12 @@ class Student(User):
     @major.setter
     def major(self, value):
         self._major = str(value).strip() if value else ""
+    
+    @student_profile_id.setter
+    def student_profile_id(self, value):
+        if value is not None and not isinstance(value, int):
+            raise TypeError("student_profile_id must be an integer.")
+        self._student_profile_id = value
 
     # --- Factories ---
     def to_dict(self):
@@ -73,13 +84,16 @@ class Student(User):
             "user_id": self._user_id,
             "level": self._level,
             "birthdate": self._birthdate,
-            "major": self._major
+            "major": self._major,
+            "student_profile_id": self._student_profile_id
         })
         return data
 
     @staticmethod
     def from_row(row):
         if not row: return None
+
+        profile_id = row["student_profile_id"] if "student_profile_id" in row.keys() else None
         return Student(
             id=row["id"],
             username=row["username"],
@@ -90,5 +104,6 @@ class Student(User):
             user_id=row["user_id"],
             level=row["level"],
             birthdate=row["birthdate"],
-            major=row["major"]
+            major=row["major"],
+            student_profile_id=profile_id
         )

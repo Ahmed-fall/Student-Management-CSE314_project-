@@ -34,8 +34,11 @@ class StudentRepository(BaseRepository):
             
             # 3. Insert into Students using that ID
             student_vals = (new_id, item.level, item.birthdate, item.major)
-            conn.execute(sql_student, student_vals)
+            cursor_stud = conn.execute(sql_student, student_vals)
             
+            # CAPTURE THE STUDENT PROFILE ID
+            item.student_profile_id = cursor_stud.lastrowid
+
             return item
 
     def update(self, item: Student):
@@ -58,7 +61,7 @@ class StudentRepository(BaseRepository):
 
     def get_all(self):
         sql = """
-        SELECT users.*, students.user_id, students.level, students.birthdate, students.major
+        SELECT users.*, students.user_id as student_profile_id, students.level, students.birthdate, students.major
         FROM users
         JOIN students ON users.id = students.user_id
         WHERE users.role = 'student'
@@ -69,7 +72,7 @@ class StudentRepository(BaseRepository):
 
     def get_by_id(self, id):
         sql = """
-        SELECT users.*, students.user_id, students.level, students.birthdate, students.major
+        SELECT users.*, students.user_id as student_profile_id, students.level, students.birthdate, students.major
         FROM users
         JOIN students ON users.id = students.user_id
         WHERE users.id = ?
