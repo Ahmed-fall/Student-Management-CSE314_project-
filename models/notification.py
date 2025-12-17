@@ -49,7 +49,7 @@ class Notification(BaseModel):
     # -------------------
     @id.setter
     def id(self, value):
-        if not isinstance(value, int):
+        if value is not None and not isinstance(value, int):
             raise TypeError("Notification ID must be an integer.")
         self._id = value
 

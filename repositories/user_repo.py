@@ -8,7 +8,7 @@ class UserRepository(BaseRepository):
         self.table_name = 'users'
 
     def create(self, item: User) -> User:
-        sql = """
+        sql = f"""
             INSERT INTO {self.table_name} 
             (username, name, email, gender, password, role) 
             VALUES (?, ?, ?, ?, ?, ?)
@@ -30,14 +30,13 @@ class UserRepository(BaseRepository):
         sql = "SELECT * FROM users WHERE email = ?"
         
         with self.get_connection() as conn:
-            cursor = conn.cursor()
             cursor = conn.execute(sql, (email,))
             return User.from_row(cursor.fetchone())
 
     def get_by_id(self, user_id):
         sql = "SELECT * FROM users WHERE id = ?"        
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, (id,))
+            cursor = conn.execute(sql, (user_id,))
             return User.from_row(cursor.fetchone())
 
     def update(self, item: User):
