@@ -37,9 +37,11 @@ class InstructorRepository(BaseRepository):
             item.user_id_fk = new_user_id
             
             # 2. Save Instructor Part
-            conn.execute(sql_instructor, (new_user_id, item.department))
+            cursor_inst= conn.execute(sql_instructor, (new_user_id, item.department))
+
+            item.instructor_profile_id = cursor_inst.lastrowid
             
-            # (Optional: fetch the instructor_profile_id if needed, usually user_id is enough)
+           
             return item
 
     def update(self, item: Instructor):
