@@ -18,7 +18,7 @@ class CourseService(BaseService):
     # ---------------------------------------------------------
     # 1. INSTRUCTOR ACTIONS (The "Missing" Methods)
     # ---------------------------------------------------------
-    def create_course(self, instructor_id: int, course_code: str, course_name: str):
+    def create_course(self, instructor_id: int, code: str, name: str, description: str = "", credits: int = 3, semester: str = "Fall 2024", max_students: int = 30):
         """
         Creates a new course.
         Args:
@@ -26,20 +26,24 @@ class CourseService(BaseService):
         """
         try:
             # 1. Validation
-            if not course_code or not course_name:
+            if not code or not name:
                 raise ValueError("Course code and name are required.")
             
             # 2. Check for Duplicate Code
-            if self.course_repo.get_by_code(course_code):
-                raise ValueError(f"Course code '{course_code}' already exists.")
+            if self.course_repo.get_by_code(code):
+                raise ValueError(f"Course code '{code}' already exists.")
 
             # 3. Create Model
             # Note: We assign the instructor_id here.
             new_course = Course(
                 id=None,
-                name=course_name,
-                code=course_code,
-                instructor_id=instructor_id 
+                name=name,
+                code=code,
+                description=description,
+                instructor_id=instructor_id,
+                credits=credits,           
+                semester=semester,         
+                max_students=max_students
             )
 
             # 4. Save
@@ -54,7 +58,7 @@ class CourseService(BaseService):
         (Previously thought to be in InstructorService)
         """
         try:
-            return self.course_repo.get_by_instructor(instructor_id)
+            return self.course_repo.get_by_instructor_id(instructor_id)
         except Exception as e:
             self.handle_db_error(e)
 
@@ -74,7 +78,7 @@ class CourseService(BaseService):
             # 2. Fetch Enrollments (and ideally join with Student profiles)
             # For this MVP, we might return enrollment objects, or fetch student names.
             # Assuming EnrollmentRepo has a method to get students directly:
-            return self.enrollment_repo.get_students_by_course(course_id)
+            return self.enrollment_repo.get_by_course_id(course_id)
 
         except Exception as e:
             self.handle_db_error(e)

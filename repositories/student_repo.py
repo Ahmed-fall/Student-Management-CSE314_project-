@@ -61,7 +61,13 @@ class StudentRepository(BaseRepository):
 
     def get_all(self):
         sql = """
-        SELECT users.*, students.user_id as student_profile_id, students.level, students.birthdate, students.major
+        SELECT 
+            users.*, 
+            students.user_id, 
+            students.id as student_profile_id, 
+            students.level, 
+            students.birthdate, 
+            students.major
         FROM users
         JOIN students ON users.id = students.user_id
         WHERE users.role = 'student'
@@ -72,7 +78,13 @@ class StudentRepository(BaseRepository):
 
     def get_by_id(self, id):
         sql = """
-        SELECT users.*, students.user_id as student_profile_id, students.level, students.birthdate, students.major
+        SELECT 
+            users.*, 
+            students.user_id, 
+            students.id as student_profile_id, 
+            students.level, 
+            students.birthdate, 
+            students.major
         FROM users
         JOIN students ON users.id = students.user_id
         WHERE users.id = ?
@@ -87,3 +99,20 @@ class StudentRepository(BaseRepository):
         sql = "DELETE FROM users WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(sql, (id,))
+    
+    def add_enrollment(self, user_id: int, course_id: int):
+        """Links a student to a course using their profile ID."""
+        sql_get_profile = "SELECT id FROM students WHERE user_id = ?"
+        sql_insert = "INSERT INTO enrollments (student_id, course_id, status, date_enrolled) VALUES (?, ?, 'enrolled', ?)"
+        
+        with self.get_connection() as conn:
+            # Find the student's internal ID first
+            res = conn.execute(sql_get_profile, (user_id,)).fetchone()
+            if not res:
+                return False
+            
+            student_profile_id = res[0]
+            # Register them
+            from datetime import datetime
+            conn.execute(sql_insert, (student_profile_id, course_id, datetime.now().isoformat()))
+            return True

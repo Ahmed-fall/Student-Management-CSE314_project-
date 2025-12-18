@@ -4,8 +4,10 @@ from core.base_service import BaseService
 # Repositories
 from repositories.course_repo import CourseRepository
 from repositories.enrollment_repo import EnrollmentRepository
-from repositories.assignment_repo import AssignmentRepository
+
 from repositories.grade_repo import GradeRepository
+from repositories.student_repo import StudentRepository
+from repositories.notification_repo import NotificationRepository
 # Note: SubmissionRepo is no longer needed here because GradeRepo handles the complex joins now.
 
 # Models
@@ -23,8 +25,10 @@ class StudentService(BaseService):
     def __init__(self):
         self.course_repo = CourseRepository()
         self.enrollment_repo = EnrollmentRepository()
-        self.assignment_repo = AssignmentRepository()
+        
         self.grade_repo = GradeRepository()
+        self.student_repo = StudentRepository()
+        self.notification_repo = NotificationRepository()
 
     # ---------------------------------------------------------
     # 1. ENROLLMENT: Join a Course
@@ -34,26 +38,22 @@ class StudentService(BaseService):
         Registers a student for a course if eligible.
         """
         try:
-            # 1. Check Course Exists
-            course = self.course_repo.get_by_id(course_id)
-            if not course:
-                raise ValueError("Course not found.")
+            student = self.student_repo.get_by_id(student_id)
+            if not student:
+                raise ValueError("Student profile not found.")
 
-            # 2. Check Duplicate Enrollment (Prevent double booking)
-            if self.enrollment_repo.is_enrolled(student_id, course_id):
-                raise ValueError("Student is already enrolled in this course.")
-
-            # 3. Create Enrollment Object
+            # 2. Create Enrollment Object
+            # We use student.student_profile_id, NOT user_id
             enrollment = Enrollment(
                 id=None,
-                student_id=student_id,
+                student_id=student.student_profile_id, 
                 course_id=course_id,
-                date_enrolled=datetime.now().isoformat(),
-                status='enrolled'
+                date_enrolled=None,
+                status="enrolled"
             )
             
-            # 4. Save to DB
-            return self.enrollment_repo.create(enrollment)
+            self.enrollment_repo.create(enrollment)
+            return True
 
         except Exception as e:
             self.handle_db_error(e)
@@ -84,45 +84,31 @@ class StudentService(BaseService):
     # ---------------------------------------------------------
     # 3. ACADEMIC: View Transcript (Optimized)
     # ---------------------------------------------------------
-    def get_transcript(self, student_id: int):
-        """
-        Generates a Report Card using optimized Repository aggregations.
-        Calculates grades dynamically: (Total Earned / Total Possible) * 100
-        """
+    def get_transcript(self, user_id):
         try:
-            report_card = []
+            student = self.student_repo.get_by_id(user_id)
+            if not student:
+                raise ValueError("Student not found")
+
+            # 1. Get data from Repo (now returns 'course_code', 'course_name', 'total_score')
+            raw_data = self.grade_repo.get_transcript_data(student.student_profile_id)
             
-            # 1. Get all active enrollments
-            enrollments = self.enrollment_repo.get_by_student_id(student_id)
-            active_enrollments = [e for e in enrollments if e.status == 'enrolled']
-
-            for enrollment in active_enrollments:
-                course = self.course_repo.get_by_id(enrollment.course_id)
+            formatted_transcript = []
+            for item in raw_data:
+                score = item.get('total_score', 0.0)
                 
-                # --- OPTIMIZED SECTION ---
-                # Let SQL do the heavy lifting
-                possible_points = self.assignment_repo.get_course_max_score(course.id)
-                earned_points = self.grade_repo.get_student_total_score(student_id, course.id)
-                # -------------------------
+                # 2. Add the letter grade logic
+                formatted_item = {
+                    'course_code': item.get('course_code'),
+                    'course_name': item.get('course_name'),
+                    'total_score': score,
+                    'letter_grade': self._calculate_letter_grade(score),
+                    'status': 'enrolled' 
+                }
+                formatted_transcript.append(formatted_item)
 
-                # Calculate Percentage
-                if possible_points > 0:
-                    percentage = (earned_points / possible_points) * 100
-                else:
-                    percentage = 0.0
-
-                report_card.append({
-                    "course_code": course.code,
-                    "course_name": course.name,
-                    "credits": course.credits,
-                    "earned_points": earned_points,
-                    "possible_points": possible_points,
-                    "current_average": round(percentage, 2),
-                    "letter_grade": self._calculate_letter_grade(percentage)
-                })
-
-            return report_card
-
+            return formatted_transcript
+            
         except Exception as e:
             self.handle_db_error(e)
 
@@ -184,27 +170,21 @@ class StudentService(BaseService):
     # ---------------------------------------------------------
     # 5. LIST ENROLLED COURSES      
     # ---------------------------------------------------------
-    def get_my_courses(self, student_id: int):
-        """
-        Returns a list of Course objects that the student is currently enrolled in.
-        """
+    def get_my_courses(self, user_id):
         try:
-            # 1. Get all enrollment records for this student
-            enrollments = self.enrollment_repo.get_by_student_id(student_id)
-            
-            if not enrollments:
+            student = self.student_repo.get_by_id(user_id)
+            if not student:
                 return []
-
-            # 2. Fetch the actual Course details for each enrollment
-            # (Looping here is fine for this scale; larger apps might use a SQL JOIN)
-            my_courses = []
-            for record in enrollments:
-                course = self.course_repo.get_by_id(record.course_id)
-                # Ensure the course still exists before adding
-                if course:
-                    my_courses.append(course)
             
-            return my_courses
-
+            # Delegates the JOIN logic to the repository
+            return self.enrollment_repo.get_courses_by_student(student.student_profile_id)
+        except Exception as e:
+            self.handle_db_error(e)
+    
+    def get_dashboard_notifications(self, user_id):
+        """Fetches alerts for the student."""
+        try:
+            
+            return self.notification_repo.get_dashboard_notifications(user_id)
         except Exception as e:
             self.handle_db_error(e)
