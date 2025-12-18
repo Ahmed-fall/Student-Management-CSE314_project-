@@ -31,7 +31,7 @@ class AssignmentService(BaseService):
     # ---------------------------------------------------------
     # 1. INSTRUCTOR: Create Assignment
     # ---------------------------------------------------------
-    def create_assignment(self, instructor_id: int, course_id: int, data: dict):
+    def create_assignment(self, instructor_id: int, course_id: int, title: str, description: str, type: str, due_date: str, max_score: int = 100):
         """
         Creates an assignment. 
         Note: instructor_id here must be the Instructor Profile ID (not User ID).
@@ -48,23 +48,23 @@ class AssignmentService(BaseService):
 
             # 3. Validation (Type)
             valid_types = {"quiz", "project", "homework", "exam"}
-            if data['type'] not in valid_types:
+            if type not in valid_types:
                 raise ValueError(f"Invalid type. Must be one of: {valid_types}")
 
             # 4. Validation (Time)
-            due_date = datetime.fromisoformat(data['due_date'])
-            if due_date < datetime.now():
+            due_dt = datetime.fromisoformat(due_date)
+            if due_dt < datetime.now():
                 raise ValueError("Due date must be in the future.")
 
-            # 5. Action: Create Assignment
+            # 5. Action: Create Assignment  
             assignment = Assignment(
                 id=None,
                 course_id=course_id,
-                title=data['title'],
-                description=data.get('description', ''),
-                type=data['type'],
-                due_date=data['due_date'],
-                max_score=data.get('max_score', 100)
+                title=title,
+                description=description,
+                type=type,
+                due_date=due_date,
+                max_score=max_score 
             )
             saved_assignment = self.assignment_repo.create(assignment)
 
@@ -89,25 +89,25 @@ class AssignmentService(BaseService):
     # ---------------------------------------------------------
     # 3. STUDENT UI: Get Status List (Critical for UI)
     # ---------------------------------------------------------
-    def get_student_assignments_status(self, student_id: int, course_id: int):
-        """
-        Merges Assignments table with Submissions table.
-        Returns: List of dicts with { ...assignment_data, 'status': 'Submitted'|'Pending'|'Overdue' }
-        """
+    def get_student_assignments_status(self, user_id: int, course_id: int):
         try:
-            # 1. Fetch all assignments for the course (Sorted by date)
+            # 1. Resolve Student Profile ID from User ID
+            with self.enrollment_repo.get_connection() as conn:
+                res = conn.execute("SELECT id FROM students WHERE user_id = ?", (user_id,)).fetchone()
+                if not res:
+                    return []
+                student_profile_id = res[0]
+
+            # 2. Fetch all assignments for the course
             assignments = self.assignment_repo.get_by_course_id(course_id)
             
-            # 2. Fetch all submissions by this student for this course
-            submissions = self.submission_repo.get_by_student_and_course(student_id, course_id)
+            # 3. Fetch all submissions using the PROFILE ID (Critical Fix)
+            submissions = self.submission_repo.get_by_student_and_course(student_profile_id, course_id)
             
-            # Create a lookup map for faster checking: { assignment_id: submission_obj }
             submission_map = {s.assignment_id: s for s in submissions}
-
             results = []
             now = datetime.now()
 
-            # 3. Merge Logic
             for asm in assignments:
                 status = "Pending"
                 submission = submission_map.get(asm.id)
@@ -117,12 +117,10 @@ class AssignmentService(BaseService):
                 elif datetime.fromisoformat(asm.due_date) < now:
                     status = "Overdue"
 
-                # Convert object to dict to add the extra 'status' field
                 asm_data = asm.to_dict()
                 asm_data['status'] = status
                 asm_data['submission_id'] = submission.id if submission else None
                 
-                # Check if graded
                 if submission:
                     grade = self.grade_repo.get_by_submission_id(submission.id)
                     if grade:
@@ -132,14 +130,13 @@ class AssignmentService(BaseService):
                 results.append(asm_data)
 
             return results
-
         except Exception as e:
             self.handle_db_error(e)
 
     # ---------------------------------------------------------
     # 4. STUDENT: Submit Assignment
     # ---------------------------------------------------------
-    def submit_assignment(self, student_id: int, assignment_id: int, content: str):
+    def submit_assignment(self, user_id: int, assignment_id: int, content: str):
         try:
             # 1. Fetch Assignment to check dates and course
             assignment = self.assignment_repo.get_by_id(assignment_id)
@@ -147,29 +144,32 @@ class AssignmentService(BaseService):
                 raise ValueError("Assignment not found.")
 
             # 2. Security: Check Enrollment
-            if not self.enrollment_repo.is_enrolled(student_id, assignment.course_id):
+            if not self.enrollment_repo.is_enrolled(user_id, assignment.course_id):
                 raise PermissionError("You are not enrolled in this course.")
+            
+            # 3. Get the Student Profile ID for the database record
+            with self.enrollment_repo.get_connection() as conn:
+                res = conn.execute("SELECT id FROM students WHERE user_id = ?", (user_id,)).fetchone()
+                student_profile_id = res[0] if res else None
 
-            # 3. Validation: Late Check
+            # 4. Validation: Late Check
             due_date = datetime.fromisoformat(assignment.due_date)
             if datetime.now() > due_date:
                 raise ValueError("Submission Deadline has passed.")
 
-            # 4. Duplicate Check
-            existing_sub = self.submission_repo.get_by_student_and_assignment(student_id, assignment_id)
+            # 5. Duplicate Check
+            existing_sub = self.submission_repo.get_by_student_and_assignment(student_profile_id, assignment_id)
             
             if existing_sub:
-                # Update existing
                 existing_sub.content = content
                 existing_sub.submitted_at = datetime.now().isoformat()
                 self.submission_repo.update(existing_sub)
                 return existing_sub
             else:
-                # Create new
                 new_sub = Submission(
                     id=None,
                     assignment_id=assignment_id,
-                    student_id=student_id,
+                    student_id=student_profile_id,
                     content=content,
                     submitted_at=datetime.now().isoformat()
                 )

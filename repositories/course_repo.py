@@ -77,3 +77,21 @@ class CourseRepository(BaseRepository):
         sql = "DELETE FROM courses WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(sql, (id,))
+
+    def get_by_code(self, code: str):
+        """
+        Fetches a course by its unique code (e.g. 'CS101').
+        Used for validation to prevent duplicates.
+        """
+        sql = "SELECT * FROM courses WHERE code = ?"
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (code,))
+            return Course.from_row(cursor.fetchone())
+    
+    def get_enrollment_count(self, course_id: int) -> int:
+        """Calculates how many students are currently in the course."""
+        sql = "SELECT COUNT(*) FROM enrollments WHERE course_id = ? AND status = 'enrolled'"
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (course_id,))
+            result = cursor.fetchone()
+            return result[0] if result else 0

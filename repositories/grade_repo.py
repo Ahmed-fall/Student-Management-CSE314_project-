@@ -92,3 +92,37 @@ class GradeRepository(BaseRepository):
             cursor = conn.execute(sql, (student_id, course_id))
             result = cursor.fetchone()[0]
             return result if result else 0.0
+    
+    def get_transcript_data(self, student_id: int):
+        """
+        Complex Reporting Query updated for named row access.
+        """
+        sql = """
+        SELECT 
+            c.code, 
+            c.name as course_name, 
+            AVG(g.grade_value) as average_score
+        FROM enrollments e
+        JOIN courses c ON e.course_id = c.id
+        LEFT JOIN assignments a ON c.id = a.course_id
+        LEFT JOIN submissions s ON a.id = s.assignment_id AND s.student_id = e.student_id
+        LEFT JOIN grades g ON s.id = g.submission_id
+        WHERE e.student_id = ? AND e.status = 'enrolled'
+        GROUP BY c.id, c.code, c.name
+        """
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (student_id,))
+            rows = cursor.fetchall()
+            
+            transcript = []
+            for row in rows:
+                # Use NAMED access since row_factory is sqlite3.Row
+                avg = row["average_score"] if row["average_score"] is not None else 0.0
+                
+                transcript.append({
+                    "course_code": row["code"],
+                    "course_name": row["course_name"],
+                    "total_score": round(avg, 2) 
+                })
+            return transcript

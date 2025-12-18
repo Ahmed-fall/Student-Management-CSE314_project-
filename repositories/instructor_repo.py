@@ -65,7 +65,7 @@ class InstructorRepository(BaseRepository):
     def get_all(self):
         # We JOIN to get the full object
         sql = """
-            SELECT u.*, i.id as instructor_profile_id, i.department 
+            SELECT u.*, i.user_id, i.id as instructor_profile_id, i.department 
             FROM users u
             JOIN instructors i ON u.id = i.user_id
         """
@@ -75,7 +75,7 @@ class InstructorRepository(BaseRepository):
 
     def get_by_id(self, id: int):
         sql = """
-            SELECT u.*, i.id as instructor_profile_id, i.department 
+            SELECT u.*, i.user_id, i.id as instructor_profile_id, i.department 
             FROM users u
             JOIN instructors i ON u.id = i.user_id
             WHERE u.id = ?

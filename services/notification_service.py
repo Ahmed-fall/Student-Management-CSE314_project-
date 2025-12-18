@@ -19,22 +19,21 @@ class NotificationService(BaseService):
         Bulk creates notifications for all ACTIVE students in a course.
         """
         try:
-            # 1. Get Active Students
-            # Ensure your EnrollmentRepo has 'get_by_course_id'
-            enrollments = self.enrollment_repo.get_by_course_id(course_id)
-            active_enrollments = [e for e in enrollments if e.status == 'enrolled']
+            # 1. Get Active User IDs (FIXED)
+            # We now fetch the actual User IDs, not student profile IDs
+            user_ids = self.enrollment_repo.get_enrolled_user_ids(course_id)
 
-            if not active_enrollments:
+            if not user_ids:
                 return # No one to notify
 
             # 2. Prepare Batch Data
             notifications_to_send = []
             now = datetime.now().isoformat()
             
-            for enrollment in active_enrollments:
+            for uid in user_ids:
                 notifications_to_send.append(Notification(
                     id=None,
-                    user_id=enrollment.student_id,
+                    user_id=uid, # Correct User ID
                     announcement_id=related_id,
                     read_flag=0,
                     sent_at=now
@@ -68,3 +67,14 @@ class NotificationService(BaseService):
             return self.notification_repo.count_unread(user_id)
         except Exception as e:
             self.handle_db_error(e)
+    
+    def get_dashboard_notifications(self, user_id: int):
+        """
+        Pass-through for the complex dashboard query.
+        Returns raw dictionaries (not Objects) for UI rendering.
+        """
+        try:
+            return self.notification_repo.get_dashboard_notifications(user_id)
+        except Exception as e:
+            self.handle_db_error(e)
+            return []
