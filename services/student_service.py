@@ -180,3 +180,31 @@ class StudentService(BaseService):
 
         except Exception as e:
             self.handle_db_error(e)
+    
+    # ---------------------------------------------------------
+    # 5. LIST ENROLLED COURSES      
+    # ---------------------------------------------------------
+    def get_my_courses(self, student_id: int):
+        """
+        Returns a list of Course objects that the student is currently enrolled in.
+        """
+        try:
+            # 1. Get all enrollment records for this student
+            enrollments = self.enrollment_repo.get_by_student_id(student_id)
+            
+            if not enrollments:
+                return []
+
+            # 2. Fetch the actual Course details for each enrollment
+            # (Looping here is fine for this scale; larger apps might use a SQL JOIN)
+            my_courses = []
+            for record in enrollments:
+                course = self.course_repo.get_by_id(record.course_id)
+                # Ensure the course still exists before adding
+                if course:
+                    my_courses.append(course)
+            
+            return my_courses
+
+        except Exception as e:
+            self.handle_db_error(e)
