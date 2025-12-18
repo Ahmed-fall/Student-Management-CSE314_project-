@@ -78,55 +78,46 @@ class AuthService(BaseService):
             # 2. Security: Hash password before saving
             password_hash = security.hash_password(user_data['password'])
 
-            # 3. Create base User object
-            new_user = User(
-                id=None,
-                username=user_data['username'],
-                name=user_data['name'],
-                email=user_data['email'],
-                gender=user_data['gender'],
-                role=role,
-                password_hash=password_hash
-            )
-            
-            # Save User to DB and get the new ID
-            created_user = self.user_repo.create(new_user)
+            if role == "student":
+                new_student = Student(
+                    id=None, 
+                    username=user_data['username'], 
+                    name=user_data['name'],
+                    email=user_data['email'], 
+                    gender=user_data['gender'],
+                    password_hash=password_hash, 
+                    level=profile_data['level'],
+                    birthdate=profile_data['birthdate'], 
+                    major=profile_data['major']
+                    # Note: No user_id needed here; the Repo generates it.
+                )
+                return self.student_repo.create(new_student)
 
-            # 4. Create specialized profile
-            try:
-                if role == "student":
-                    student = Student(
-                        id=None, 
-                        username=created_user.username, 
-                        name=created_user.name,
-                        email=created_user.email, 
-                        gender=created_user.gender,
-                        password_hash=password_hash, 
-                        level=profile_data['level'],
-                        birthdate=profile_data['birthdate'], 
-                        major=profile_data['major'],
-                        user_id=created_user.id
-                    )
-                    return self.student_repo.create(student)
+            elif role == "instructor":
+                new_instructor = Instructor(
+                    id=None, 
+                    username=user_data['username'], 
+                    name=user_data['name'],
+                    email=user_data['email'], 
+                    gender=user_data['gender'], 
+                    role=role,
+                    password_hash=password_hash, 
+                    department=profile_data['department']
+                )
+                return self.instructor_repo.create(new_instructor)
 
-                elif role == "instructor":
-                    instructor = Instructor(
-                        id=None, 
-                        username=created_user.username, 
-                        name=created_user.name,
-                        email=created_user.email, 
-                        gender=created_user.gender, 
-                        role=role,
-                        password_hash=password_hash, 
-                        department=profile_data['department'],
-                        user_id_fk=created_user.id
-                    )
-                    return self.instructor_repo.create(instructor)
-
-            except Exception as profile_err:
-                # ROLLBACK: Remove User if Profile creation fails
-                self.user_repo.delete(created_user.id)
-                raise profile_err
+            else:
+                # Fallback for Basic Users or Admins
+                new_user = User(
+                    id=None,
+                    username=user_data['username'],
+                    name=user_data['name'],
+                    email=user_data['email'],
+                    gender=user_data['gender'],
+                    role=role,
+                    password_hash=password_hash
+                )
+                return self.user_repo.create(new_user)
 
         except Exception as e:
             self.handle_db_error(e)
