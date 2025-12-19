@@ -9,10 +9,13 @@ from repositories.enrollment_repo import EnrollmentRepository
 from repositories.grade_repo import GradeRepository
 from repositories.notification_repo import NotificationRepository
 
+from services.notification_service import NotificationService
+
 # Models
 from models.assignment import Assignment
 from models.submission import Submission
 from models.grade import Grade
+from models.notification import Notification
 
 class AssignmentService(BaseService):
     """
@@ -27,6 +30,11 @@ class AssignmentService(BaseService):
         self.enrollment_repo = EnrollmentRepository()
         self.grade_repo = GradeRepository()
         self.notification_repo = NotificationRepository()
+
+    def _get_student_profile_id(self, user_id: int) -> int | None:
+        with self.enrollment_repo.get_connection() as conn:
+            res = conn.execute("SELECT id FROM students WHERE user_id = ?", (user_id,)).fetchone()
+            return res[0] if res else None
 
     # ---------------------------------------------------------
     # 1. INSTRUCTOR: Create Assignment
@@ -68,8 +76,11 @@ class AssignmentService(BaseService):
             )
             saved_assignment = self.assignment_repo.create(assignment)
 
-            # 6. Future: Notification Logic would go here
-            # (We would create an announcement, then loop enrollments to notify students)
+            # 6. Notification Logic
+            # Assume announcement_id is the same as assignment_id for simplicity, or create announcement if needed
+            # For now, notify students using related_id as assignment_id
+            notification_service = NotificationService()  # Instantiate directly or use dependency if possible
+            notification_service.notify_course(course_id, saved_assignment.id)
             
             return saved_assignment
 
@@ -89,47 +100,65 @@ class AssignmentService(BaseService):
     # ---------------------------------------------------------
     # 3. STUDENT UI: Get Status List (Critical for UI)
     # ---------------------------------------------------------
-    def get_student_assignments_status(self, user_id: int, course_id: int):
+    def get_student_assignments(self, user_id: int, course_id: int = None):
         try:
-            # 1. Resolve Student Profile ID from User ID
-            with self.enrollment_repo.get_connection() as conn:
-                res = conn.execute("SELECT id FROM students WHERE user_id = ?", (user_id,)).fetchone()
-                if not res:
-                    return []
-                student_profile_id = res[0]
+            student_profile_id = self._get_student_profile_id(user_id)
+            if not student_profile_id:
+                return []
 
-            # 2. Fetch all assignments for the course
-            assignments = self.assignment_repo.get_by_course_id(course_id)
-            
-            # 3. Fetch all submissions using the PROFILE ID (Critical Fix)
-            submissions = self.submission_repo.get_by_student_and_course(student_profile_id, course_id)
-            
-            submission_map = {s.assignment_id: s for s in submissions}
             results = []
             now = datetime.now()
+            courses_map = {}
+
+            if course_id:
+                # Single course mode
+                if not self.enrollment_repo.is_enrolled(user_id, course_id):
+                    raise PermissionError("Not enrolled in this course.")
+                courses_map[course_id] = self.course_repo.get_by_id(course_id)
+                assignments = self.assignment_repo.get_by_course_id(course_id)
+                submissions = self.submission_repo.get_by_student_and_course(student_profile_id, course_id)
+            else:
+                # All courses mode
+                enrollments = self.enrollment_repo.get_by_student_id(student_profile_id)
+                course_ids = [e.course_id for e in enrollments if e.status == 'enrolled']
+                if not course_ids:
+                    return []
+                courses_map = {cid: self.course_repo.get_by_id(cid) for cid in course_ids}
+                assignments = []
+                for cid in course_ids:
+                    assignments.extend(self.assignment_repo.get_by_course_id(cid))
+                submissions = self.submission_repo.get_by_student_id(student_profile_id)
+
+            submission_map = {s.assignment_id: s for s in submissions}
 
             for asm in assignments:
+                if asm.course_id not in courses_map:
+                    continue  # Skip if course not loaded (edge case)
+                
                 status = "Pending"
                 submission = submission_map.get(asm.id)
-
+                grade = None
                 if submission:
                     status = "Submitted"
+                    grade = self.grade_repo.get_by_submission_id(submission.id)
                 elif datetime.fromisoformat(asm.due_date) < now:
                     status = "Overdue"
 
                 asm_data = asm.to_dict()
+                asm_data['course_code'] = courses_map[asm.course_id].code
                 asm_data['status'] = status
                 asm_data['submission_id'] = submission.id if submission else None
                 
-                if submission:
-                    grade = self.grade_repo.get_by_submission_id(submission.id)
-                    if grade:
-                        asm_data['grade'] = grade.grade_value
-                        asm_data['feedback'] = grade.feedback
+                if grade:
+                    asm_data['grade'] = grade.grade_value
+                    asm_data['feedback'] = grade.feedback
 
                 results.append(asm_data)
 
+            # Sort by due date
+            results.sort(key=lambda x: x['due_date'])
             return results
+
         except Exception as e:
             self.handle_db_error(e)
 
@@ -148,9 +177,9 @@ class AssignmentService(BaseService):
                 raise PermissionError("You are not enrolled in this course.")
             
             # 3. Get the Student Profile ID for the database record
-            with self.enrollment_repo.get_connection() as conn:
-                res = conn.execute("SELECT id FROM students WHERE user_id = ?", (user_id,)).fetchone()
-                student_profile_id = res[0] if res else None
+            student_profile_id = self._get_student_profile_id(user_id)
+            if not student_profile_id:
+                raise ValueError("Student profile not found.")
 
             # 4. Validation: Late Check
             due_date = datetime.fromisoformat(assignment.due_date)
@@ -164,7 +193,7 @@ class AssignmentService(BaseService):
                 existing_sub.content = content
                 existing_sub.submitted_at = datetime.now().isoformat()
                 self.submission_repo.update(existing_sub)
-                return existing_sub
+                sub = existing_sub
             else:
                 new_sub = Submission(
                     id=None,
@@ -173,7 +202,25 @@ class AssignmentService(BaseService):
                     content=content,
                     submitted_at=datetime.now().isoformat()
                 )
-                return self.submission_repo.create(new_sub)
+                sub = self.submission_repo.create(new_sub)
+
+            # 6. Notify Instructor
+            course = self.course_repo.get_by_id(assignment.course_id)
+            with self.course_repo.get_connection() as conn:
+                res = conn.execute("SELECT user_id FROM instructors WHERE id = ?", (course.instructor_id,)).fetchone()
+                instructor_user_id = res[0] if res else None
+
+            if instructor_user_id:
+                notification = Notification(
+                    id=None,
+                    user_id=instructor_user_id,
+                    announcement_id=assignment_id,  # Using assignment_id as related_id
+                    read_flag=0,
+                    sent_at=datetime.now().isoformat()
+                )
+                self.notification_repo.create(notification)
+
+            return sub
 
         except Exception as e:
             self.handle_db_error(e)
@@ -206,6 +253,21 @@ class AssignmentService(BaseService):
             )
             saved_grade = self.grade_repo.create(grade)
 
+            # 5. Notify Student
+            with self.enrollment_repo.get_connection() as conn:
+                res = conn.execute("SELECT user_id FROM students WHERE id = ?", (submission.student_id,)).fetchone()
+                student_user_id = res[0] if res else None
+
+            if student_user_id:
+                notification = Notification(
+                    id=None,
+                    user_id=student_user_id,
+                    announcement_id=assignment.id,  # Using assignment_id
+                    read_flag=0,
+                    sent_at=datetime.now().isoformat()
+                )
+                self.notification_repo.create(notification)
+
             return saved_grade
 
         except Exception as e:
@@ -231,3 +293,39 @@ class AssignmentService(BaseService):
 
         except Exception as e:
             self.handle_db_error(e)
+
+    def get_assignment_detail_for_student(self, user_id: int, assignment_id: int):
+        """
+        Fetches the assignment details AND the student's current submission (if any).
+        Returns a dictionary for the View.
+        """
+        try:
+            # 1. Fetch Assignment
+            assignment = self.assignment_repo.get_by_id(assignment_id)
+            if not assignment:
+                return None
+
+            # 2. Resolve Student Profile ID
+            # (We need this to look up the specific submission for this student)
+            student_profile_id = self._get_student_profile_id(user_id)
+
+            # 3. Fetch Submission (if student exists)
+            submission = None
+            if student_profile_id:
+                submission = self.submission_repo.get_by_student_and_assignment(student_profile_id, assignment_id)
+            
+            grade = None
+            if submission:
+                # Add this line to fetch the grade!
+                grade = self.grade_repo.get_by_submission_id(submission.id)
+
+            # 4. Return the Dictionary the View expects
+            return {
+                "assignment": assignment,
+                "submission": submission,
+                "grade": grade
+            }
+
+        except Exception as e:
+            self.handle_db_error(e)
+            return None

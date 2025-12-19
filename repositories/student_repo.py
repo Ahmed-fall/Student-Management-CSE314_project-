@@ -116,3 +116,12 @@ class StudentRepository(BaseRepository):
             from datetime import datetime
             conn.execute(sql_insert, (student_profile_id, course_id, datetime.now().isoformat()))
             return True
+    def get_profile_id_by_user_id(self, user_id: int):
+        """
+        Helper: Resolves the Auth User ID to the internal Student Profile ID.
+        Required by AssignmentService.
+        """
+        sql = "SELECT id FROM students WHERE user_id = ?"
+        with self.get_connection() as conn:
+            res = conn.execute(sql, (user_id,)).fetchone()
+            return res[0] if res else None

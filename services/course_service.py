@@ -18,7 +18,7 @@ class CourseService(BaseService):
     # ---------------------------------------------------------
     # 1. INSTRUCTOR ACTIONS (The "Missing" Methods)
     # ---------------------------------------------------------
-    def create_course(self, instructor_id: int, code: str, name: str, description: str = "", credits: int = 3, semester: str = "Fall 2024", max_students: int = 30):
+    def create_course(self, instructor_id: int, code: str, name: str, description: str = ""):
         """
         Creates a new course.
         Args:
@@ -41,9 +41,7 @@ class CourseService(BaseService):
                 code=code,
                 description=description,
                 instructor_id=instructor_id,
-                credits=credits,           
-                semester=semester,         
-                max_students=max_students
+                credits=3, semester="Fall 2024", max_students=30 # Defaults
             )
 
             # 4. Save
@@ -78,7 +76,7 @@ class CourseService(BaseService):
             # 2. Fetch Enrollments (and ideally join with Student profiles)
             # For this MVP, we might return enrollment objects, or fetch student names.
             # Assuming EnrollmentRepo has a method to get students directly:
-            return self.enrollment_repo.get_by_course_id(course_id)
+            return self.enrollment_repo.get_students_by_course(course_id)
 
         except Exception as e:
             self.handle_db_error(e)
@@ -102,5 +100,52 @@ class CourseService(BaseService):
                 c for c in all_courses 
                 if query.lower() in c.name.lower() or query.lower() in c.code.lower()
             ]
+        except Exception as e:
+            self.handle_db_error(e)
+
+    def get_course_by_id(self, course_id: int):
+        """
+        Fetches a single course by ID.
+        """
+        try:
+            return self.course_repo.get_by_id(course_id)
+        except Exception as e:
+            self.handle_db_error(e)
+    
+    def get_all_courses_with_details(self):
+        try:
+            courses = self.get_all_courses()
+            results = []
+            for c in courses:
+                d = c.to_dict() if hasattr(c, 'to_dict') else vars(c)
+                with self.course_repo.get_connection() as conn:
+                    res = conn.execute("""
+                        SELECT u.name 
+                        FROM instructors i 
+                        JOIN users u ON i.user_id = u.id 
+                        WHERE i.id = ?
+                    """, (c.instructor_id,)).fetchone()
+                    d['instructor_name'] = res[0] if res else "Unknown"
+                results.append(d)
+            return results
+        except Exception as e:
+            self.handle_db_error(e)
+    
+    def search_courses_with_details(self, query: str):
+        try:
+            courses = self.search_courses(query)
+            results = []
+            for c in courses:
+                d = c.to_dict() if hasattr(c, 'to_dict') else vars(c)
+                with self.course_repo.get_connection() as conn:
+                    res = conn.execute("""
+                        SELECT u.name 
+                        FROM instructors i 
+                        JOIN users u ON i.user_id = u.id 
+                        WHERE i.id = ?
+                    """, (c.instructor_id,)).fetchone()
+                    d['instructor_name'] = res[0] if res else "Unknown"
+                results.append(d)
+            return results
         except Exception as e:
             self.handle_db_error(e)
