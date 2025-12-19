@@ -10,7 +10,7 @@ class Submission(BaseModel):
     - Validation: Setters enforce type and value constraints immediately.
     """
 
-    def __init__(self, id: int, assignment_id: int, student_id: int, content: str, submitted_at: str):
+    def __init__(self, id, assignment_id, student_id, content, submitted_at, grade=None, feedback=None, status="submitted"):
         """
         Initialize and VALIDATE all data immediately.
         We use self.variable = value (the setter) instead of self._variable = value
@@ -24,6 +24,10 @@ class Submission(BaseModel):
         # 2. Content (Strict validation)
         self.content = content          # Cannot be empty
         self.submitted_at = submitted_at # Cannot be empty (Timestamp)
+
+        self.grade = grade
+        self.feedback = feedback
+        self.status = status
 
     # ---------------------------------------------------------
     # Getters (@property) - Explicitly exposing private data
@@ -104,21 +108,31 @@ class Submission(BaseModel):
         Matches the database column names exactly.
         """
         return {
-            "id": self._id,
-            "assignment_id": self._assignment_id,
-            "student_id": self._student_id,
-            "content": self._content,
-            "submitted_at": self._submitted_at
+            "id": self.id,
+            "assignment_id": self.assignment_id,
+            "student_id": self.student_id,
+            "submitted_at": self.submitted_at,
+            "content": self.content,
+            "grade": self.grade,
+            "status": self.status
         }
     
     @staticmethod
     def from_row(row):
         if not row:
             return None
+    
+        data = dict(row)
+
         return Submission(
-            id=row['id'],
-            assignment_id=row['assignment_id'],
-            student_id=row['student_id'],
-            content=row['content'],
-            submitted_at=row['submitted_at']
+            id=data['id'],
+            assignment_id=data['assignment_id'],
+            student_id=data['student_id'],
+            content=data['content'],
+            submitted_at=data['submitted_at'], 
+            
+            # Now these work because 'data' is a real dictionary
+            grade=data.get('grade_value'),     
+            feedback=data.get('feedback'),
+            status="graded" if data.get('grade_value') else "submitted"
         )

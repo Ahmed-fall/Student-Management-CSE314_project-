@@ -11,7 +11,7 @@ class Assignment(BaseModel):
     """
 
     # Constant to enforce database constraints on 'type' column
-    ALLOWED_TYPES = {"quiz", "project"}
+    ALLOWED_TYPES = {"quiz", "project", "homework", "exam"}
 
     def __init__(self, id: int, course_id: int, title: str, description: str, type: str, due_date: str, max_score: int):
         """
