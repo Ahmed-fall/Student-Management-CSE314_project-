@@ -23,7 +23,7 @@ def bootstrap_services():
     # ... register others
 
 def main():
-    print("--- Starting Student Management System (Investor Mode) ---")
+    print("--- Starting Student Management System  ---")
     
     # 1. Infrastructure
     create_tables()
