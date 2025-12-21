@@ -118,7 +118,7 @@ def create_tables():
         title TEXT NOT NULL,
         message TEXT NOT NULL,
         created_at TEXT,
-        FOREIGN KEY (course_id) REFERENCES courses(id)
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
     );
     """)
 
@@ -130,7 +130,7 @@ def create_tables():
         read_flag INTEGER DEFAULT 0,
         sent_at TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (announcement_id) REFERENCES announcements(id)
+        FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
     );
     """)
 
