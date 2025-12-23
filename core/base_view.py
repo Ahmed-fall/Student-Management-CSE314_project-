@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import ttk
 from abc import ABC, abstractmethod
 
+from ui.styles import COLORS, FONTS
+
 class BaseView(tk.Frame, ABC):
     """
     The parent class for all UI Screens (Views).
@@ -34,3 +36,17 @@ class BaseView(tk.Frame, ABC):
         """Helper to wipe the frame if needed."""
         for widget in self.winfo_children():
             widget.destroy()
+
+    def add_back_button(self, parent):
+        """Adds a consistent back button to the top of the page."""
+        back_btn = tk.Button(
+            parent, 
+            text="⬅ Back", 
+            command=self.router.go_back, # Uses the router's internal stack
+            bg=COLORS["background"], 
+            fg=COLORS["primary"],
+            font=FONTS["body_bold"],
+            bd=0,
+            cursor="hand2"
+        )
+        back_btn.pack(side="left", padx=10, pady=10)

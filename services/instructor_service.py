@@ -13,17 +13,22 @@ class InstructorService(BaseService):
         self.instructor_repo = InstructorRepository()
 
     def get_instructor_profile(self, user_id: int):
-        """
-        Fetches the full instructor object, including joined user data.
-        """
-        try:
-            # Uses the JOIN logic in the repo to return a complete Instructor model
-            instructor = self.instructor_repo.get_by_id(user_id)
-            if not instructor:
-                raise ValueError("Instructor profile not found.")
-            return instructor
-        except Exception as e:
-            self.handle_db_error(e)
+            """
+            Resolves a User ID to an Instructor model.
+            """
+            try:
+                # OLD (Caused Error): 
+                # profile = self.instructor_repo.get_by_user_id(user_id)
+
+                # NEW (Fix): Call the existing method, which already queries by User ID
+                profile = self.instructor_repo.get_by_id(user_id)
+                
+                if not profile:
+                    return None
+                return profile
+            except Exception as e:
+                self.handle_db_error(e)
+                return None
 
     def update_department(self, instructor_id: int, current_user_id: int, new_dept: str):
         """
@@ -56,3 +61,4 @@ class InstructorService(BaseService):
             return self.instructor_repo.get_all()
         except Exception as e:
             self.handle_db_error(e)
+

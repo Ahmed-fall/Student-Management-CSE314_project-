@@ -1,33 +1,39 @@
 import tkinter as tk
 from tkinter import ttk 
 from ui.styles import COLORS, FONTS
+from core.session import Session
 
 
+# sidebar.py
 class Sidebar(tk.Frame):
     def __init__(self, parent, controller):
-        
         super().__init__(parent, bg=COLORS["sidebar"], width=250)
-        
         self.controller = controller
-        self.pack_propagate(False) # Force width to stay 250px
+        self.pack_propagate(False)
         
-        # App Title in Sidebar
-        # Note: We use standard tk.Label here because it's easier to set specific colors (bg="#2c3e50")
-        tk.Label(self, text="Student\nPortal", font=("Helvetica", 20, "bold"), 
+        user = Session.current_user #
+        role_title = "Student\nPortal" if user.role == "student" else "Faculty\nPortal"
+        
+        tk.Label(self, text=role_title, font=("Helvetica", 20, "bold"), 
                  bg=COLORS["sidebar"], fg="white", justify="left").pack(pady=(30, 40), padx=20, anchor="w")
 
-        # Navigation Buttons
-        self.add_nav_btn("📊  Dashboard", "student_dashboard")
-        self.add_nav_btn("📚  My Courses", "student_courses") 
-        self.add_nav_btn("🔍  Course Catalog", "student_catalog")
-        self.add_nav_btn("📝  Assignments", "student_assignments") 
-        self.add_nav_btn("🎓  Grades", "student_grades") 
-        self.add_nav_btn("🔔  Notifications", "student_notifications")
+        # --- DYNAMIC NAVIGATION ---
+        if user.role == "student":
+            self.add_nav_btn("📊  Dashboard", "student_dashboard")
+            self.add_nav_btn("📚  My Courses", "student_courses") 
+            self.add_nav_btn("🔍  Course Catalog", "student_catalog")
+            self.add_nav_btn("📝  Assignments", "student_assignments") 
+            self.add_nav_btn("🎓  Grades", "student_grades") 
+            self.add_nav_btn("🔔  Notifications", "student_notifications")
         
-        # Spacer to push Logout to bottom (Standard tk.Frame is fine here for simple spacer)
-        tk.Frame(self, bg=COLORS["sidebar"]).pack(fill="y", expand=True) # Matches sidebar color
-        
-        # Logout
+
+        elif user.role == "instructor":
+            self.add_nav_btn("📊  Dashboard", "instructor_dashboard")          
+            self.add_nav_btn("📢  Announcements", "instructor_announcements")
+            self.add_nav_btn("🏫  Campus Manager", "campus_manager")
+
+        # Spacer and Logout
+        tk.Frame(self, bg=COLORS["sidebar"]).pack(fill="y", expand=True)
         self.add_nav_btn("🚪  Logout", "login")
 
     def add_nav_btn(self, text, route):

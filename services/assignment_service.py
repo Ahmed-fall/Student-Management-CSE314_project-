@@ -8,7 +8,7 @@ from repositories.course_repo import CourseRepository
 from repositories.enrollment_repo import EnrollmentRepository
 from repositories.grade_repo import GradeRepository
 from repositories.notification_repo import NotificationRepository
-
+from repositories.announcement_repo import AnnouncementRepository
 from services.notification_service import NotificationService
 
 # Models
@@ -16,6 +16,7 @@ from models.assignment import Assignment
 from models.submission import Submission
 from models.grade import Grade
 from models.notification import Notification
+from models.announcement import Announcement
 
 class AssignmentService(BaseService):
     """
@@ -30,57 +31,44 @@ class AssignmentService(BaseService):
         self.enrollment_repo = EnrollmentRepository()
         self.grade_repo = GradeRepository()
         self.notification_repo = NotificationRepository()
+        self.announcement_repo = AnnouncementRepository()
 
     def _get_student_profile_id(self, user_id: int) -> int | None:
         with self.enrollment_repo.get_connection() as conn:
             res = conn.execute("SELECT id FROM students WHERE user_id = ?", (user_id,)).fetchone()
             return res[0] if res else None
 
-    # ---------------------------------------------------------
-    # 1. INSTRUCTOR: Create Assignment
+# ---------------------------------------------------------
+    # 1. INSTRUCTOR: Create Assignment (With Auto-Announcement)
     # ---------------------------------------------------------
     def create_assignment(self, instructor_id: int, course_id: int, title: str, description: str, type: str, due_date: str, max_score: int = 100):
-        """
-        Creates an assignment. 
-        Note: instructor_id here must be the Instructor Profile ID (not User ID).
-        """
         try:
-            # 1. Validation (Course exists)
+            # 1. Validation
             course = self.course_repo.get_by_id(course_id)
-            if not course:
-                raise ValueError("Course not found.")
-
-            # 2. Validation (Security: Ownership)
-            # Ensure the instructor creating this actually owns the course
+            if not course: raise ValueError("Course not found.")
             self.check_permission(course.instructor_id, instructor_id)
 
-            # 3. Validation (Type)
-            valid_types = {"quiz", "project", "homework", "exam"}
-            if type not in valid_types:
-                raise ValueError(f"Invalid type. Must be one of: {valid_types}")
-
-            # 4. Validation (Time)
-            due_dt = datetime.fromisoformat(due_date)
-            if due_dt < datetime.now():
+            if datetime.fromisoformat(due_date) < datetime.now():
                 raise ValueError("Due date must be in the future.")
 
-            # 5. Action: Create Assignment  
-            assignment = Assignment(
-                id=None,
-                course_id=course_id,
-                title=title,
-                description=description,
-                type=type,
-                due_date=due_date,
-                max_score=max_score 
-            )
+            # 2. Create Assignment
+            assignment = Assignment(None, course_id, title, description, type, due_date, max_score)
             saved_assignment = self.assignment_repo.create(assignment)
 
-            # 6. Notification Logic
-            # Assume announcement_id is the same as assignment_id for simplicity, or create announcement if needed
-            # For now, notify students using related_id as assignment_id
-            notification_service = NotificationService()  # Instantiate directly or use dependency if possible
-            notification_service.notify_course(course_id, saved_assignment.id)
+            # 3. [BRIDGE] Create System Announcement
+            # This satisfies the Foreign Key requirement for notifications
+            sys_announcement = Announcement(
+                id=None,
+                course_id=course_id,
+                title=f"New Assignment: {title}",
+                message=f"A new {type} has been posted. Due: {due_date}",
+                created_at=datetime.now().isoformat()
+            )
+            saved_ann = self.announcement_repo.create(sys_announcement)
+
+            # 4. Send Notifications linked to the Announcement
+            notification_service = NotificationService()
+            notification_service.notify_course(course_id, saved_ann.id)
             
             return saved_assignment
 
@@ -91,11 +79,14 @@ class AssignmentService(BaseService):
     # 2. GENERAL: View Assignments
     # ---------------------------------------------------------
     def get_assignments_by_course(self, course_id: int):
-        """Returns list sorted by closest deadline (ASC)."""
+        """
+        Fetches all assignments for a specific course.
+        """
         try:
             return self.assignment_repo.get_by_course_id(course_id)
         except Exception as e:
             self.handle_db_error(e)
+            return []
 
     # ---------------------------------------------------------
     # 3. STUDENT UI: Get Status List (Critical for UI)
@@ -226,34 +217,37 @@ class AssignmentService(BaseService):
             self.handle_db_error(e)
 
     # ---------------------------------------------------------
-    # 5. INSTRUCTOR: Grade Assignment
+    # 2. INSTRUCTOR: Grade Assignment (With Student Notification)
     # ---------------------------------------------------------
     def grade_assignment(self, instructor_id: int, submission_id: int, grade_value: float, feedback: str):
         try:
-            # 1. Fetch Submission to find context
+            # 1. Fetch Context
             submission = self.submission_repo.get_by_id(submission_id)
-            if not submission:
-                raise ValueError("Submission not found.")
+            if not submission: raise ValueError("Submission not found.")
             
-            # 2. Fetch Assignment -> Course to verify Instructor ownership
             assignment = self.assignment_repo.get_by_id(submission.assignment_id)
             course = self.course_repo.get_by_id(assignment.course_id)
             self.check_permission(course.instructor_id, instructor_id)
             
-            # 3. Validation: Grade Range
+            # 2. Validate & Save Grade
             if not (0 <= grade_value <= assignment.max_score):
                 raise ValueError(f"Grade must be between 0 and {assignment.max_score}.")
 
-            # 4. Create Grade Record
-            grade = Grade(
-                id=None,
-                submission_id=submission_id,
-                grade_value=grade_value,
-                feedback=feedback
-            )
+            grade = Grade(None, submission_id, grade_value, feedback)
             saved_grade = self.grade_repo.create(grade)
 
-            # 5. Notify Student
+            # 3. [BRIDGE] Create Notification Bridge
+            # We create a generic "Grades Updated" announcement so we can link the notification
+            sys_announcement = Announcement(
+                id=None,
+                course_id=course.id,
+                title=f"Grade Posted: {assignment.title}",
+                message=f"Grades for {assignment.title} have been updated.",
+                created_at=datetime.now().isoformat()
+            )
+            saved_ann = self.announcement_repo.create(sys_announcement)
+
+            # 4. Notify ONLY the specific student
             with self.enrollment_repo.get_connection() as conn:
                 res = conn.execute("SELECT user_id FROM students WHERE id = ?", (submission.student_id,)).fetchone()
                 student_user_id = res[0] if res else None
@@ -262,7 +256,7 @@ class AssignmentService(BaseService):
                 notification = Notification(
                     id=None,
                     user_id=student_user_id,
-                    announcement_id=assignment.id,  # Using assignment_id
+                    announcement_id=saved_ann.id, # Link to valid Announcement ID
                     read_flag=0,
                     sent_at=datetime.now().isoformat()
                 )

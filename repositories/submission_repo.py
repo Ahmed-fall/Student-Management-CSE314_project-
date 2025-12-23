@@ -101,3 +101,26 @@ class SubmissionRepository(BaseRepository):
         with self.get_connection() as conn:
             cursor = conn.execute(sql, (student_id, assignment_id))
             return Submission.from_row(cursor.fetchone())
+            
+    def get_grading_queue(self, assignment_id: int):
+            """
+            Fetches all submissions for a specific assignment, including Student Name and Grade.
+            Used by the Instructor Grading View.
+            """
+            sql = """
+            SELECT 
+                s.id as submission_id,
+                u.name as student_name,
+                s.submitted_at,
+                g.grade_value,
+                g.feedback
+            FROM submissions s
+            JOIN students st ON s.student_id = st.id
+            JOIN users u ON st.user_id = u.id
+            LEFT JOIN grades g ON s.id = g.submission_id
+            WHERE s.assignment_id = ?
+            ORDER BY s.submitted_at DESC
+            """
+            with self.get_connection() as conn:
+                cursor = conn.execute(sql, (assignment_id,))
+                return [dict(row) for row in cursor.fetchall()]

@@ -182,3 +182,14 @@ class StudentController(BaseController):
             return service.enroll_course(user.id, course_id)
 
         self.run_async(task, callback)
+    
+    def drop_course(self, course_id, callback):
+        """Calls the service to drop a course in the background."""
+        user = Session.current_user
+        if not user: return
+
+        def task():
+            service = self.get_service(StudentService)
+            return service.drop_course(user.id, course_id)
+
+        self.run_async(task, callback)

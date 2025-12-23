@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox
 from core.base_view import BaseView
 from ui.styles import COLORS, FONTS
 from ui.components.sidebar import Sidebar
@@ -97,3 +98,16 @@ class StudentCoursesView(BaseView):
         ttk.Button(action_frame, text="Enter Classroom", style="Secondary.TButton",
             command=lambda cid=course_id: self.controller.open_classroom(cid)
             ).pack(side="right")
+        
+        tk.Button(action_frame, text="Drop Course", 
+                bg=COLORS["danger"], fg="white",
+                command=lambda cid=course_id: self.handle_drop(cid)).pack(side="right", padx=10)
+
+        def handle_drop(self, course_id):
+            if messagebox.askyesno("Confirm", "Are you sure you want to drop this course?"):
+                self.controller.drop_course(course_id, self.on_drop_complete)
+
+        def on_drop_complete(self, result):
+            if result:
+                messagebox.showinfo("Success", "Course dropped successfully.")
+                self.controller.load_my_courses(self.update_course_list)
