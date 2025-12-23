@@ -129,18 +129,21 @@ class InstructorDashboardView(BaseView):
         self.setup_ui()
 
     def render_students_list(self, students):
-        """Creates a popup window to display enrollment details."""
-        popup = tk.Toplevel(self)
-        popup.title("Course Enrollment")
-        popup.geometry("350x450")
-        popup.configure(bg="white")
+            """Creates a popup window to display enrollment details."""
+            popup = tk.Toplevel(self)
+            popup.title("Course Enrollment")
+            popup.geometry("350x450")
+            popup.configure(bg="white")
 
-        tk.Label(popup, text=f"Enrolled Students ({len(students)})", font=FONTS["h2"], bg="white").pack(pady=15)
-        
-        list_frame = tk.Frame(popup, bg="white")
-        list_frame.pack(fill="both", expand=True, padx=20, pady=10)
+            tk.Label(popup, text=f"Enrolled Students ({len(students)})", font=FONTS["h2"], bg="white").pack(pady=15)
+            
+            list_frame = tk.Frame(popup, bg="white")
+            list_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-        for s in students:
-            # Assuming student profile has name and major
-            lbl = tk.Label(list_frame, text=f"• {s.name} [{s.major}]", bg="white", font=FONTS["body"], anchor="w")
-            lbl.pack(fill="x", pady=2)
+            for s in students:
+                # FIX: Use dictionary syntax ['name'] instead of object syntax .name
+                name = s.get('name', 'Unknown')
+                major = s.get('major', 'N/A')
+                
+                lbl = tk.Label(list_frame, text=f"• {name} [{major}]", bg="white", font=FONTS["body"], anchor="w")
+                lbl.pack(fill="x", pady=2)
