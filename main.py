@@ -12,6 +12,7 @@ from services.course_service import CourseService
 from services.notification_service import NotificationService
 from services.student_service import StudentService
 from services.assignment_service import AssignmentService
+from services.announcement_service import AnnouncementService
 # ... import other services
 
 def bootstrap_services():
@@ -23,10 +24,11 @@ def bootstrap_services():
     ServiceLocator.register(StudentService, StudentService())
     ServiceLocator.register(AssignmentService, AssignmentService())
     ServiceLocator.register(InstructorService, InstructorService())
+    ServiceLocator.register(AnnouncementService, AnnouncementService())
     # ... register others
 
 def main():
-    print("--- Starting Student Management System (Investor Mode) ---")
+    print("--- Starting Student Management System  ---")
     
     # 1. Infrastructure
     create_tables()

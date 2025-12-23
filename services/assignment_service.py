@@ -1,7 +1,3 @@
-from datetime import datetime
-from core.base_service import BaseService
-
-# Repositories
 from repositories.assignment_repo import AssignmentRepository
 from repositories.submission_repo import SubmissionRepository
 from repositories.course_repo import CourseRepository
@@ -9,7 +5,12 @@ from repositories.enrollment_repo import EnrollmentRepository
 from repositories.grade_repo import GradeRepository
 from repositories.notification_repo import NotificationRepository
 from repositories.announcement_repo import AnnouncementRepository
+from datetime import datetime
+from core.base_service import BaseService
+
 from services.notification_service import NotificationService
+
+from database.db_connection import get_db_connection
 
 # Models
 from models.assignment import Assignment
@@ -67,8 +68,24 @@ class AssignmentService(BaseService):
             saved_ann = self.announcement_repo.create(sys_announcement)
 
             # 4. Send Notifications linked to the Announcement
+            #notification_service = NotificationService()
+            #notification_service.notify_course(course_id, saved_ann.id)
+            # 6. Notification Logic
+            # Create announcement for the new assignment
+            announcement_title = f"New Assignment: {title}"
+            announcement_message = description
+            announcement_created_at = datetime.now().isoformat()
+            
+            with get_db_connection() as conn:
+                cursor = conn.execute("""
+                    INSERT INTO announcements (course_id, title, message, created_at)
+                    VALUES (?, ?, ?, ?)
+                """, (course_id, announcement_title, announcement_message, announcement_created_at))
+                announcement_id = cursor.lastrowid
+
+            # Now notify the course with the announcement_id
             notification_service = NotificationService()
-            notification_service.notify_course(course_id, saved_ann.id)
+            notification_service.notify_course(course_id, announcement_id)
             
             return saved_assignment
 
@@ -202,10 +219,22 @@ class AssignmentService(BaseService):
                 instructor_user_id = res[0] if res else None
 
             if instructor_user_id:
+                # Create announcement for submission
+                announcement_title = f"New Submission for {assignment.title}"
+                announcement_message = f"A student has submitted the assignment."
+                announcement_created_at = datetime.now().isoformat()
+                
+                with get_db_connection() as conn_ann:
+                    cursor = conn_ann.execute("""
+                        INSERT INTO announcements (course_id, title, message, created_at)
+                        VALUES (?, ?, ?, ?)
+                    """, (assignment.course_id, announcement_title, announcement_message, announcement_created_at))
+                    announcement_id = cursor.lastrowid
+
                 notification = Notification(
                     id=None,
                     user_id=instructor_user_id,
-                    announcement_id=assignment_id,  # Using assignment_id as related_id
+                    announcement_id=announcement_id,
                     read_flag=0,
                     sent_at=datetime.now().isoformat()
                 )
@@ -253,10 +282,22 @@ class AssignmentService(BaseService):
                 student_user_id = res[0] if res else None
 
             if student_user_id:
+                # Create announcement for grade
+                announcement_title = f"Grade Posted for {assignment.title}"
+                announcement_message = f"Your grade has been posted."
+                announcement_created_at = datetime.now().isoformat()
+                
+                with get_db_connection() as conn_ann:
+                    cursor = conn_ann.execute("""
+                        INSERT INTO announcements (course_id, title, message, created_at)
+                        VALUES (?, ?, ?, ?)
+                    """, (assignment.course_id, announcement_title, announcement_message, announcement_created_at))
+                    announcement_id = cursor.lastrowid
+
                 notification = Notification(
                     id=None,
                     user_id=student_user_id,
-                    announcement_id=saved_ann.id, # Link to valid Announcement ID
+                    announcement_id=announcement_id,
                     read_flag=0,
                     sent_at=datetime.now().isoformat()
                 )
