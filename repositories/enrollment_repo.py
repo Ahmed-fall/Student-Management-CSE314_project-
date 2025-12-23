@@ -109,6 +109,17 @@ class EnrollmentRepository(BaseRepository):
             cursor = conn.execute(sql, (student_profile_id,))
             # We reuse the Course model's factory to return standard objects
             return [Course.from_row(row) for row in cursor.fetchall()]
+        
+    def delete_enrollment(self, student_id: int, course_id: int) -> bool:
+        """Permanently removes the enrollment record from the database."""
+        sql = "DELETE FROM enrollments WHERE student_id = ? AND course_id = ?"
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(sql, (student_id, course_id))
+                # Return True if a row was actually deleted
+                return cursor.rowcount > 0
+        except Exception:
+            return False
     
     def get_enrolled_user_ids(self, course_id: int):
         """

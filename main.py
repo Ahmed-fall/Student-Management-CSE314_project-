@@ -1,5 +1,7 @@
 import tkinter as tk
 from database.initialize_db import create_tables
+from services.instructor_service import InstructorService
+from services.user_service import UserService
 from ui.main_window import MainWindow
 from ui.styles import setup_theme
 
@@ -21,6 +23,7 @@ def bootstrap_services():
     ServiceLocator.register(NotificationService, NotificationService())
     ServiceLocator.register(StudentService, StudentService())
     ServiceLocator.register(AssignmentService, AssignmentService())
+    ServiceLocator.register(InstructorService, InstructorService())
     ServiceLocator.register(AnnouncementService, AnnouncementService())
     # ... register others
 

@@ -40,6 +40,14 @@ class StudentService(BaseService):
             res = conn.execute("SELECT id FROM students WHERE user_id = ?", (user_id,)).fetchone()
             return res[0] if res else None
 
+    def get_students_by_course(self, course_id: int):
+            """Fetches the list of students for the instructor's popup."""
+            try:
+                return self.student_repo.get_students_by_course(course_id)
+            except Exception as e:
+                self.handle_db_error(e)
+                return []
+            
     # ---------------------------------------------------------
     # 1. ENROLLMENT: Join a Course
     # ---------------------------------------------------------
@@ -75,21 +83,19 @@ class StudentService(BaseService):
     # 2. ENROLLMENT: Drop Course
     # ---------------------------------------------------------
     def drop_course(self, user_id: int, course_id: int):
+        """Logic to drop a course for a student."""
         try:
+            # 1. Resolve student profile
             student_profile_id = self._get_student_profile_id(user_id)
             if not student_profile_id:
                 raise ValueError("Student profile not found.")
 
-            enrollments = self.enrollment_repo.get_by_student_id(student_profile_id)
-            target_enrollment = next((e for e in enrollments if e.course_id == course_id), None)
-            
-            if not target_enrollment:
+            # 2. Check if actually enrolled
+            if not self.enrollment_repo.is_enrolled(user_id, course_id):
                 raise ValueError("You are not enrolled in this course.")
 
-            target_enrollment.status = 'dropped'
-            self.enrollment_repo.update(target_enrollment)
-            return True
-
+            # 3. Execute drop via the repository
+            return self.enrollment_repo.delete_enrollment(student_profile_id, course_id)
         except Exception as e:
             self.handle_db_error(e)
 
@@ -203,7 +209,22 @@ class StudentService(BaseService):
         except Exception as e:
             self.handle_db_error(e)
     
-   
+    def drop_course(self, user_id: int, course_id: int):
+        """Logic to drop a course for a student."""
+        try:
+            # 1. Resolve student profile
+            student_profile_id = self._get_student_profile_id(user_id)
+            if not student_profile_id:
+                raise ValueError("Student profile not found.")
+
+            # 2. Check if actually enrolled
+            if not self.enrollment_repo.is_enrolled(user_id, course_id):
+                raise ValueError("You are not enrolled in this course.")
+
+            # 3. Execute drop
+            return self.enrollment_repo.delete_enrollment(student_profile_id, course_id)
+        except Exception as e:
+            self.handle_db_error(e)
         
     def get_student_grades(self, user_id):
         """
@@ -234,3 +255,4 @@ class StudentService(BaseService):
             })
             
         return results
+    
