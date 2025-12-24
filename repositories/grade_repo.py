@@ -42,7 +42,6 @@ class GradeRepository(BaseRepository):
         sql = "SELECT * FROM grades WHERE id = ?"
         with self.get_connection() as conn:
             cursor = conn.execute(sql, (id,))
-            # CRITICAL UPDATE: Convert single row to Object
             return Grade.from_row(cursor.fetchone())
 
     def get_by_submission_id(self, submission_id: int):
@@ -117,7 +116,6 @@ class GradeRepository(BaseRepository):
             
             transcript = []
             for row in rows:
-                # Use NAMED access since row_factory is sqlite3.Row
                 avg = row["average_score"] if row["average_score"] is not None else 0.0
                 
                 transcript.append({

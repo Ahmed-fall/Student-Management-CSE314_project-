@@ -9,7 +9,6 @@ class UserService(BaseService):
     """
 
     def __init__(self):
-        # [cite_start]The service talks to the repository, never the DB directly [cite: 1792]
         self.user_repo = UserRepository()
 
     def get_user_by_id(self, user_id: int):

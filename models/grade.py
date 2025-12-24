@@ -16,11 +16,11 @@ class Grade(BaseModel):
         We use self.variable = value (the setter) instead of self._variable = value
         to ensure validation logic runs during object creation.
         """
-        # 1. IDs (Read-only context mostly, but type checked)
+        # 1. IDs 
         self.id = id
         self.submission_id = submission_id
 
-        # 2. Grading Data (Strict validation)
+        # 2. Grading Data 
         self.grade_value = grade_value  # Must be a number >= 0
         self.feedback = feedback        # Can be empty, sanitized to string
 
@@ -78,8 +78,7 @@ class Grade(BaseModel):
         if value is None:
             self._feedback = ""
         elif not isinstance(value, str):
-             # Optional: Enforce strict string type if desired, or just stringify
-             # Given strictness level, let's enforce string type but allow None above
+             
              raise TypeError("Feedback must be a string.")
         else:
             self._feedback = value.strip()

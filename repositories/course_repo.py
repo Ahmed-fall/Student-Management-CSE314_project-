@@ -95,8 +95,24 @@ class CourseRepository(BaseRepository):
             cursor = conn.execute(sql, (course_id,))
             result = cursor.fetchone()
             return result[0] if result else 0
+
+    def get_enrolled_students_details(self, course_id: int):
+        """
+        [NEW] Fetches details (Name, Major) for the Roster Popup.
+        Joins Enrollments -> Students -> Users.
+        """
+        sql = """
+        SELECT u.name, u.email, s.major 
+        FROM enrollments e
+        JOIN students s ON e.student_id = s.student_profile_id
+        JOIN users u ON s.user_id = u.id
+        WHERE e.course_id = ?
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (course_id,))
+            return cursor.fetchall()
         
-def unassign_instructor(self, course_id: int):
+    def unassign_instructor(self, course_id: int):
         """Sets the instructor_id of a course to NULL in the database."""
         sql = "UPDATE courses SET instructor_id = NULL WHERE id = ?"
         with self.get_connection() as conn:

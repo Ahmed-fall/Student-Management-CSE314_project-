@@ -17,7 +17,7 @@ class Instructor(User):
         self.user_id_fk = user_id_fk                 
         self.department = department
 
-    # --- Getters (@property) for Public Access (Instructor-specific) ---
+    # --- Getters (@property) --- 
     
     @property
     def instructor_profile_id(self):
@@ -85,6 +85,6 @@ class Instructor(User):
             password_hash=row['password'],
             # Instructor Data
             department=row['department'],
-            instructor_profile_id=row['instructor_profile_id'], # Ensure SQL aliases this!
+            instructor_profile_id=row['instructor_profile_id'], 
             user_id_fk=row['user_id']
         )

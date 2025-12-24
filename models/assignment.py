@@ -102,7 +102,6 @@ class Assignment(BaseModel):
         if not isinstance(value, str):
             raise TypeError("Type must be a string.")
         
-        # Enforce Case-Insensitivity (DB stores 'quiz' or 'project')
         cleaned_type = value.lower().strip()
         
         if cleaned_type not in self.ALLOWED_TYPES:
@@ -158,7 +157,6 @@ class Assignment(BaseModel):
         if not row:
             return None
         
-        # Calls the constructor, which triggers all validation logic above.
         return Assignment(
             id=row['id'],
             course_id=row['course_id'],

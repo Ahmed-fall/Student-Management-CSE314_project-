@@ -47,7 +47,7 @@ def create_tables():
         FOREIGN KEY (user_id) REFERENCES users(id)
     );
     """)
-    # --- TEAM MEMBER 3: COURSES --- We need Instructors table first to be able to excute this (due to the forign key (instructor_id))
+    # --- TEAM MEMBER 3: COURSES --- 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS courses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,9 +1,19 @@
+import os
+import sys
 import tkinter as tk
+
+if getattr(sys, 'frozen', False):
+    application_path = os.path.dirname(sys.executable)
+    os.chdir(application_path)  
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
 from database.initialize_db import create_tables
 from services.instructor_service import InstructorService
 from services.user_service import UserService
 from ui.main_window import MainWindow
 from ui.styles import setup_theme
+
 
 # Import Services and Locator
 from core.service_locator import ServiceLocator
@@ -29,6 +39,9 @@ def bootstrap_services():
 
 def main():
     print("--- Starting Student Management System  ---")
+
+    
+    
     
     # 1. Infrastructure
     create_tables()

@@ -83,8 +83,7 @@ class CourseService(BaseService):
             self.check_permission(course.instructor_id, instructor_id)
 
             # 2. Fetch Enrollments (and ideally join with Student profiles)
-            # For this MVP, we might return enrollment objects, or fetch student names.
-            # Assuming EnrollmentRepo has a method to get students directly:
+    
             return self.enrollment_repo.get_students_by_course(course_id)
 
         except Exception as e:
@@ -128,7 +127,7 @@ class CourseService(BaseService):
         try:
             course = self.course_repo.get_by_id(course_id)
             if course:
-                course.instructor_id = None # Set to NULL
+                course.instructor_id = None 
                 self.course_repo.update(course) # Save change
                 return True
             return False
@@ -150,7 +149,6 @@ class CourseService(BaseService):
         """Optional: Search by name or code."""
         try:
             all_courses = self.course_repo.get_all()
-            # Simple Python filter (Optimized: do this in SQL in real apps)
             return [
                 c for c in all_courses 
                 if query.lower() in c.name.lower() or query.lower() in c.code.lower()
