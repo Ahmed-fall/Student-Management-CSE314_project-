@@ -22,15 +22,7 @@ class InstructorController(BaseController):
             return self.navigate("login")
 
         def task():
-            # 1. Get the specialized Instructor profile
-            inst_service = self.get_service(InstructorService)
-            profile = inst_service.get_instructor_profile(user.id)
-            
-            # 2. Get the list of courses taught by this instructor
-            course_service = self.get_service(CourseService)
-            courses = course_service.get_courses_by_instructor(profile.instructor_profile_id)
-            
-            return {"profile": profile, "courses": courses}
+            return self.get_service(InstructorService).get_dashboard_data(user.id)
 
         self.run_async(task, callback)
 
@@ -73,25 +65,32 @@ class InstructorController(BaseController):
 
     def submit_grade(self, submission_id, grade_value, feedback, callback):
         """
-        Submits a grade and feedback for a student's assignment submission.
+        Submits a grade via the Service (triggers notifications and validation).
         """
         user = Session.current_user
         if not user: return
 
         def task():
-            # Get the AssignmentService which handles the GradeRepository
+            # 1. Get Service
             service = self.get_service(AssignmentService)
             
-            # This calls the service logic to create/update the grade record
-            return service.grade_submission(
-                instructor_user_id=user.id,
+            # 2. Get Instructor Profile ID (Required for permission checks)
+            inst_service = self.get_service(InstructorService)
+            profile = inst_service.get_instructor_profile(user.id)
+            
+            if not profile:
+                raise ValueError("Instructor profile not found.")
+
+            # 3. Call the Service logic we fixed earlier
+            return service.grade_assignment(
+                instructor_id=profile.instructor_profile_id,
                 submission_id=submission_id,
-                grade_value=grade_value,
+                grade_value=float(grade_value),
                 feedback=feedback
             )
 
+        # 4. Run async and update UI on completion
         self.run_async(task, callback)
-
     # ------------------------------------------------------------------
     # ANNOUNCEMENTS LOGIC
     # ------------------------------------------------------------------
@@ -129,7 +128,6 @@ class InstructorController(BaseController):
                 if not profile: return False
 
                 # 2. Create Announcement
-                # [FIX] Instantiate directly to avoid 'NoneType' error if ServiceLocator fails
                 ann_service = AnnouncementService() 
                 
                 return ann_service.create_announcement(
@@ -204,7 +202,6 @@ class InstructorController(BaseController):
 
             def task():
                 # 1. Get the specialized Instructor Profile 
-                # (This fixes the "Access Denied" error)
                 inst_service = self.get_service(InstructorService)
                 profile = inst_service.get_instructor_profile(user.id)
                 
@@ -234,22 +231,4 @@ class InstructorController(BaseController):
             
             self.run_async(task, callback)
 
-    def submit_grade(self, submission_id, grade_value, feedback, callback):
-        """Saves the grade to the database."""
-        def task():
-            grade_repo = self.get_service(AssignmentService).grade_repo
-            
-            # 1. Check if grade already exists (Update) or is new (Create)
-            existing = grade_repo.get_by_submission_id(submission_id) #
-            
-            if existing:
-                existing.grade_value = float(grade_value)
-                existing.feedback = feedback
-                grade_repo.update(existing)
-            else:
-                from models.grade import Grade
-                new_grade = Grade(None, submission_id, float(grade_value), feedback)
-                grade_repo.create(new_grade)
-            return True
-
-        self.run_async(task, callback)
+   

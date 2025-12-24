@@ -113,10 +113,14 @@ class InstructorGradingView(BaseView):
     def update_assignment_list(self, data):
         """Fills the top table."""
         assignments = data.get("assignments", [])
+
+        self.assignments_map = {}
+
         for item in self.assign_tree.get_children():
             self.assign_tree.delete(item)
             
         for a in assignments:
+            self.assignments_map[a.id] = a
             self.assign_tree.insert("", "end", values=(a.id, a.title, a.due_date))
 
     def on_assignment_select(self, event):
@@ -124,7 +128,9 @@ class InstructorGradingView(BaseView):
         selected = self.assign_tree.selection()
         if not selected: return
         
-        assign_id = self.assign_tree.item(selected[0], "values")[0]
+        assign_id_str = self.assign_tree.item(selected[0], "values")[0]
+        assign_id = int(assign_id_str) 
+
         self.current_assignment_id = assign_id
         
         # Call Controller to get submissions
@@ -162,18 +168,37 @@ class InstructorGradingView(BaseView):
             self.feedback_ent.insert("1.0", data['feedback'])
 
     def submit_grade(self):
-        if not hasattr(self, 'current_submission_id'):
+        if not hasattr(self, 'current_submission_id') or not self.current_submission_id:
             messagebox.showwarning("Error", "Select a student first.")
             return
             
-        score = self.score_ent.get()
+        score_input = self.score_ent.get().strip()
         feedback = self.feedback_ent.get("1.0", tk.END).strip()
         
-        if not score.replace('.', '', 1).isdigit():
-            messagebox.showerror("Error", "Score must be a number.")
+        # 1. Number Validation
+        try:
+            score_val = float(score_input)
+        except ValueError:
+            messagebox.showerror("Error", "Score must be a valid number.")
             return
 
-        self.controller.submit_grade(self.current_submission_id, score, feedback, self.on_grade_success)
+        # 2. Max Score Validation
+        current_assignment = self.assignments_map.get(self.current_assignment_id)
+        
+        if current_assignment:
+            max_limit = current_assignment.max_score
+            if score_val > max_limit:
+                messagebox.showerror("Invalid Grade", f"Score cannot exceed the maximum of {max_limit}.")
+                return
+            if score_val < 0:
+                messagebox.showerror("Invalid Grade", "Score cannot be negative.")
+                return
+        else:
+            print(f"Warning: Could not find assignment ID {self.current_assignment_id} in map.")
+
+        # 3. Submit to Controller
+        self.controller.submit_grade(self.current_submission_id, score_input, feedback, self.on_grade_success)
+
 
     def on_grade_success(self, result):
         if result:

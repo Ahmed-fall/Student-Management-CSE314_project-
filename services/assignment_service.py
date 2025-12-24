@@ -56,8 +56,7 @@ class AssignmentService(BaseService):
             assignment = Assignment(None, course_id, title, description, type, due_date, max_score)
             saved_assignment = self.assignment_repo.create(assignment)
 
-            # 3. [BRIDGE] Create System Announcement
-            # This satisfies the Foreign Key requirement for notifications
+            # 3.Create System Announcement 
             sys_announcement = Announcement(
                 id=None,
                 course_id=course_id,
@@ -67,25 +66,9 @@ class AssignmentService(BaseService):
             )
             saved_ann = self.announcement_repo.create(sys_announcement)
 
-            # 4. Send Notifications linked to the Announcement
-            #notification_service = NotificationService()
-            #notification_service.notify_course(course_id, saved_ann.id)
-            # 6. Notification Logic
-            # Create announcement for the new assignment
-            announcement_title = f"New Assignment: {title}"
-            announcement_message = description
-            announcement_created_at = datetime.now().isoformat()
-            
-            with get_db_connection() as conn:
-                cursor = conn.execute("""
-                    INSERT INTO announcements (course_id, title, message, created_at)
-                    VALUES (?, ?, ?, ?)
-                """, (course_id, announcement_title, announcement_message, announcement_created_at))
-                announcement_id = cursor.lastrowid
-
-            # Now notify the course with the announcement_id
+            # 4. Notification Logic
             notification_service = NotificationService()
-            notification_service.notify_course(course_id, announcement_id)
+            notification_service.notify_course(course_id, saved_ann.id)
             
             return saved_assignment
 
@@ -252,52 +235,61 @@ class AssignmentService(BaseService):
         try:
             # 1. Fetch Context
             submission = self.submission_repo.get_by_id(submission_id)
-            if not submission: raise ValueError("Submission not found.")
+            if not submission: 
+                raise ValueError("Submission not found.")
             
             assignment = self.assignment_repo.get_by_id(submission.assignment_id)
-            course = self.course_repo.get_by_id(assignment.course_id)
-            self.check_permission(course.instructor_id, instructor_id)
             
-            # 2. Validate & Save Grade
-            if not (0 <= grade_value <= assignment.max_score):
-                raise ValueError(f"Grade must be between 0 and {assignment.max_score}.")
+          
+            # 2.  VALIDATION: Grade Value
+            try:
+                val = float(grade_value)
+            except ValueError:
+                raise ValueError("Grade must be a valid number.")
 
-            grade = Grade(None, submission_id, grade_value, feedback)
-            saved_grade = self.grade_repo.create(grade)
+            if val < 0:
+                raise ValueError("Grade cannot be negative.")
+            
+            if val > assignment.max_score:
+                raise ValueError(f"Grade {val} exceeds the maximum score of {assignment.max_score}.")
 
-            # 3. [BRIDGE] Create Notification Bridge
-            # We create a generic "Grades Updated" announcement so we can link the notification
-            sys_announcement = Announcement(
-                id=None,
-                course_id=course.id,
-                title=f"Grade Posted: {assignment.title}",
-                message=f"Grades for {assignment.title} have been updated.",
-                created_at=datetime.now().isoformat()
-            )
-            saved_ann = self.announcement_repo.create(sys_announcement)
+            # 3. Create OR Update Grade
+            existing_grade = self.grade_repo.get_by_submission_id(submission_id)
+            
+            saved_grade = None
+            if existing_grade:
+                existing_grade.grade_value = val
+                existing_grade.feedback = feedback
+                saved_grade = self.grade_repo.update(existing_grade)
+            else:
+                grade = Grade(None, submission_id, val, feedback)
+                saved_grade = self.grade_repo.create(grade)
 
-            # 4. Notify ONLY the specific student
+            # 4. Notification Logic
+            student_user_id = None
             with self.enrollment_repo.get_connection() as conn:
                 res = conn.execute("SELECT user_id FROM students WHERE id = ?", (submission.student_id,)).fetchone()
                 student_user_id = res[0] if res else None
 
             if student_user_id:
-                # Create announcement for grade
-                announcement_title = f"Grade Posted for {assignment.title}"
-                announcement_message = f"Your grade has been posted."
-                announcement_created_at = datetime.now().isoformat()
+                # A. Create a backend announcement to link the notification to
+                ann_title = f"Grade Posted: {assignment.title}"
+                ann_message = f"You received a score of {val}/{assignment.max_score}."
                 
-                with get_db_connection() as conn_ann:
-                    cursor = conn_ann.execute("""
-                        INSERT INTO announcements (course_id, title, message, created_at)
-                        VALUES (?, ?, ?, ?)
-                    """, (assignment.course_id, announcement_title, announcement_message, announcement_created_at))
-                    announcement_id = cursor.lastrowid
+                sys_announcement = Announcement(
+                    id=None,
+                    course_id=assignment.course_id,
+                    title=ann_title,
+                    message=ann_message,
+                    created_at=datetime.now().isoformat()
+                )
+                saved_ann = self.announcement_repo.create(sys_announcement)
 
+                # B. Create the Notification for the specific student
                 notification = Notification(
                     id=None,
                     user_id=student_user_id,
-                    announcement_id=announcement_id,
+                    announcement_id=saved_ann.id,
                     read_flag=0,
                     sent_at=datetime.now().isoformat()
                 )
@@ -305,6 +297,9 @@ class AssignmentService(BaseService):
 
             return saved_grade
 
+        except ValueError as ve:
+            # Re-raise value errors so the Controller can show the specific message
+            raise ve
         except Exception as e:
             self.handle_db_error(e)
 
@@ -341,7 +336,6 @@ class AssignmentService(BaseService):
                 return None
 
             # 2. Resolve Student Profile ID
-            # (We need this to look up the specific submission for this student)
             student_profile_id = self._get_student_profile_id(user_id)
 
             # 3. Fetch Submission (if student exists)

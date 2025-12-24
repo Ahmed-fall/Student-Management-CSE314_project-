@@ -5,21 +5,28 @@ from core.session import Session
 class AuthController(BaseController):
     
     # --- Login Logic ---
-    def login(self, username, password):
-        # 1. Validation (Fast check on main thread)
+    def login(self, username, password, on_fail=None):
+        
+        # 1. Validation
         if not username or not password:
-            self.show_error("Validation Error", "Please enter both username and password.")
+            error_msg = "Please enter both username and password."
+            if on_fail:
+                on_fail(error_msg)
+            else:
+                self.show_error("Validation Error", error_msg)
             return
 
         # 2. Define the heavy task (Runs in background)
         def db_task():
-            # Use get_service() instead of creating a new instance
             service = self.get_service(AuthService)
             return service.login(username, password)
 
         # 3. Define what happens when DB finishes
         def on_complete(user):
             if user:
+                # Success: Clear any error messages first
+                if on_fail: on_fail("") 
+
                 # Update Session
                 Session.login(user)
                 
@@ -28,10 +35,17 @@ class AuthController(BaseController):
                     self.navigate("student_dashboard")
                 elif user.role == "instructor":
                     self.navigate("instructor_dashboard")
+                elif user.role == "admin":
+                    self.navigate("admin_dashboard")
                 else:
                     self.show_error("Access Denied", f"Role '{user.role}' not supported yet.")
             else:
-                self.show_error("Login Failed", "Invalid username or password.")
+                # Failure: Update the View's error label
+                error_msg = "Invalid username or password."
+                if on_fail:
+                    on_fail(error_msg)
+                else:
+                    self.show_error("Login Failed", error_msg)
 
         # 4. Execute
         self.run_async(db_task, on_complete)

@@ -7,10 +7,9 @@ COLORS = {
     "accent": "#E74C3C",        # Red
     "background": "#ECF0F1",    # Light Gray
     "surface": "#FFFFFF",       # White (Card Background)
-    "text": "#2C3E50",
-    "text_light": "#FFFFFF",
+    "text": "#2C3E50",          # Dark Blue (For text on white)
+    "text_light": "#FFFFFF",    # White (For text on dark)
     "placeholder": "#95a5a6",
-    
     
     "card": "#FFFFFF",          # White for cards
     "sidebar": "#2C3E50",       # Matches primary for consistency
@@ -26,8 +25,6 @@ FONTS = {
     "small": ("Helvetica", 10),
     "small_bold": ("Helvetica", 10, "bold"),
     "icon": ("Segoe UI Emoji", 14),
-    
-    
     "button": ("Helvetica", 11, "bold") 
 }
 
@@ -80,17 +77,35 @@ def setup_theme(root):
     # KPI Card Style
     style.configure("Card.TFrame", background="white", relief="raised")
 
-    # --- TABLE (TREEVIEW) STYLES (Required for Assignments View) ---
-    style.configure("Treeview",
+    # ==========================================================
+    # FIXED TREEVIEW STYLES (ISOLATED)
+    # ==========================================================
+    
+    # We define a CUSTOM style named "Primary.Treeview".
+    # This prevents other views from accidentally resetting the global "Treeview" style.
+    
+    # 1. Main Table Rows
+    style.configure("Primary.Treeview",
                     background="white",
                     fieldbackground="white",
                     foreground=COLORS["text"],
                     rowheight=30,
-                    font=FONTS["body"])
+                    font=FONTS["body"],
+                    borderwidth=0)
     
-    style.configure("Treeview.Heading",
+    # 2. Table Header (Notice the syntax: StyleName + .Heading)
+    style.configure("Primary.Treeview.Heading",
                     background=COLORS["primary"],
                     foreground="white",
-                    font=FONTS["button"]) 
+                    font=FONTS["button"],
+                    relief="flat") 
     
-    style.map('Treeview', background=[('selected', COLORS["secondary"])])
+    # 3. Header Interaction (Hover/Press)
+    style.map("Primary.Treeview.Heading",
+              background=[('active', COLORS["primary"]), ('pressed', COLORS["primary"])],
+              foreground=[('active', 'white'), ('pressed', 'white')])
+
+    # 4. Row Selection State
+    style.map("Primary.Treeview",
+              background=[('selected', COLORS["secondary"])], 
+              foreground=[('selected', 'white')])

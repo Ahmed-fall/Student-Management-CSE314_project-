@@ -17,6 +17,7 @@ class Announcement(BaseModel):
         self.id = id
         self.course_id = course_id
         self.title = title
+        self._message = message
         self.message = message
         self.created_at = created_at or datetime.datetime.now().isoformat()
 
@@ -66,9 +67,14 @@ class Announcement(BaseModel):
 
     @message.setter
     def message(self, value):
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("Message must be a non-empty string.")
-        self._message = value.strip()
+        if value is None:
+            self._message = "No details provided."
+        elif not isinstance(value, str):
+            self._message = str(value)
+        elif not value.strip():
+            self._message = "No details provided."
+        else:
+            self._message = value.strip()
 
     @created_at.setter
     def created_at(self, value):
@@ -103,10 +109,15 @@ class Announcement(BaseModel):
         """
         if row is None:
             return None
+
+        msg = row["message"]
+        if msg is None: 
+            msg = "No details provided."
+        
         return Announcement(
             id=row["id"],
             course_id=row["course_id"],
             title=row["title"],
-            message=row["message"],
+            message=msg,
             created_at=row["created_at"]
         )

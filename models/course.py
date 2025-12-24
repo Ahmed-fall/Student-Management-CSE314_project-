@@ -36,6 +36,7 @@ class Course(BaseModel):
         self.credits = credits
         self.semester = semester
         self.max_students = max_students
+        self._enrolled_count = 0
 
     # ---------------------------------------------------------
     # Getters (@property)
@@ -168,7 +169,8 @@ class Course(BaseModel):
             "credits": self._credits,
             "semester": self._semester,
             "max_students": self._max_students,
-            "instructor_id": self._instructor_id
+            "instructor_id": self._instructor_id,
+            "enrolled_count": self._enrolled_count
         }
 
     @staticmethod

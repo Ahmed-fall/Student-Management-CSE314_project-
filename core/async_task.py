@@ -12,7 +12,6 @@ class AsyncTask:
         self.callback = callback_func
         self.error_callback = error_callback
         
-        # FIX: daemon=True means "Kill this thread if the main app closes"
         self.thread = threading.Thread(target=self._run, daemon=True) 
         self.thread.start()
 

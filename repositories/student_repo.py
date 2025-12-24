@@ -130,11 +130,9 @@ class StudentRepository(BaseRepository):
     def _fetch_all(self, sql, params=()):
         """Helper to ensure results can be accessed by column name (like s.name)."""
         with self.get_connection() as conn:
-            # This is the "magic line" that fixes the 'tuple' error
             conn.row_factory = sqlite3.Row 
             cursor = conn.execute(sql, params)
             rows = cursor.fetchall()
-            # Convert sqlite3.Row objects to standard dictionaries so UI can read them
             return [dict(row) for row in rows]
 
     def get_students_by_course(self, course_id: int):

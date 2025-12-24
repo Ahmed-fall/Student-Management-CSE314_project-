@@ -87,7 +87,6 @@ class InstructorRepository(BaseRepository):
     def delete(self, id: int):
         # If DB has CASCADE DELETE, deleting User deletes Instructor.
         # Otherwise, delete Instructor first, then User.
-        # Assuming CASCADE is ON or we delete parent:
         sql = "DELETE FROM users WHERE id = ?"
         with self.get_connection() as conn:
             conn.execute(sql, (id,))

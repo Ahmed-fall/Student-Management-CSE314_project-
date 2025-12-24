@@ -22,8 +22,8 @@ class Submission(BaseModel):
         self.student_id = student_id
 
         # 2. Content (Strict validation)
-        self.content = content          # Cannot be empty
-        self.submitted_at = submitted_at # Cannot be empty (Timestamp)
+        self.content = content          
+        self.submitted_at = submitted_at 
 
         self.grade = grade
         self.feedback = feedback
@@ -89,7 +89,7 @@ class Submission(BaseModel):
     @submitted_at.setter
     def submitted_at(self, value):
         # We ensure the timestamp exists and is a string.
-        # (Detailed date format validation happens in Service/Utils, but we ensure string existence here)
+      
         if not isinstance(value, str):
             raise TypeError("Submitted_at timestamp must be a string.")
         
@@ -131,7 +131,6 @@ class Submission(BaseModel):
             content=data['content'],
             submitted_at=data['submitted_at'], 
             
-            # Now these work because 'data' is a real dictionary
             grade=data.get('grade_value'),     
             feedback=data.get('feedback'),
             status="graded" if data.get('grade_value') else "submitted"

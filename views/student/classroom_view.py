@@ -1,8 +1,10 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from core.base_view import BaseView
 from ui.styles import COLORS, FONTS
 from ui.components.sidebar import Sidebar
+from datetime import datetime
+import platform
 
 class ClassroomView(BaseView):
     def __init__(self, parent, router, *args, **kwargs):
@@ -17,100 +19,241 @@ class ClassroomView(BaseView):
         return StudentController(self.router)
 
     def setup_ui(self):
-        # Layout Setup
-        main_layout = tk.Frame(self, bg=COLORS["background"])
-        main_layout.pack(fill="both", expand=True)
+        # --- 1. Main Layout ---
+        self.main_layout = tk.Frame(self, bg=COLORS["background"])
+        self.main_layout.pack(fill="both", expand=True)
 
-        Sidebar(main_layout, self.controller).pack(side="left", fill="y")
+        # Sidebar
+        self.sidebar = Sidebar(self.main_layout, self.controller)
+        self.sidebar.pack(side="left", fill="y")
 
-        content = tk.Frame(main_layout, bg=COLORS["background"], padx=30, pady=30)
-        content.pack(side="right", fill="both", expand=True)
+        # Content Area
+        self.content = tk.Frame(self.main_layout, bg=COLORS["background"], padx=30, pady=30)
+        self.content.pack(side="right", fill="both", expand=True)
 
-        # Header
-        self.header_frame = tk.Frame(content, bg=COLORS["background"])
+        # --- 2. Header & Navigation ---
+        self.header_frame = tk.Frame(self.content, bg=COLORS["background"])
         self.header_frame.pack(fill="x", pady=(0, 20))
 
-        tk.Button(self.header_frame, text="← Back to Courses", 
-                  font=FONTS["small"], bg=COLORS["background"], fg="gray", bd=0, cursor="hand2",
-                  command=lambda: self.controller.navigate("student_courses")).pack(anchor="w")
+        # Back Link
+        btn_back = tk.Button(self.header_frame, text="← Back to My Courses", 
+                             font=FONTS["small_bold"], bg=COLORS["background"], fg=COLORS["placeholder"], 
+                             bd=0, cursor="hand2", activebackground=COLORS["background"],
+                             command=lambda: self.controller.navigate("student_courses"))
+        btn_back.pack(anchor="w")
 
-        self.course_title_lbl = tk.Label(self.header_frame, text="Loading...", 
+        # Course Title
+        self.course_title_lbl = tk.Label(self.header_frame, text="Loading Classroom...", 
                                          font=FONTS["h1"], bg=COLORS["background"], fg=COLORS["primary"])
         self.course_title_lbl.pack(anchor="w", pady=(5,0))
 
-        # Tabs
-        self.tabs = ttk.Notebook(content)
+        # --- 3. Tabs (Notebook) ---
+        self.tabs = ttk.Notebook(self.content)
         self.tabs.pack(fill="both", expand=True)
 
-        self.tab_stream = tk.Frame(self.tabs, bg="white", padx=20, pady=20)
+        # ============================================================
+        # TAB 1: STREAM (SCROLLABLE)
+        # ============================================================
+        self.tab_stream = tk.Frame(self.tabs, bg=COLORS["background"])
         self.tabs.add(self.tab_stream, text="  📢 Stream  ")
+        
+        # Helper to create scrollable area
+        self.stream_canvas, self.stream_content = self._create_scrollable_area(self.tab_stream)
 
-        self.tab_classwork = tk.Frame(self.tabs, bg="white", padx=20, pady=20)
+
+        # ============================================================
+        # TAB 2: CLASSWORK (SCROLLABLE)
+        # ============================================================
+        self.tab_classwork = tk.Frame(self.tabs, bg=COLORS["background"])
         self.tabs.add(self.tab_classwork, text="  📝 Classwork  ")
+        
+        # Helper to create scrollable area
+        self.classwork_canvas, self.classwork_content = self._create_scrollable_area(self.tab_classwork)
 
-        # 3. Use the captured ID to load data
+        # --- 4. Load Data ---
         if self.course_id:
             self.controller.load_classroom_data(self.course_id, self.update_ui)
         else:
-            self.course_title_lbl.config(text="Error: No Course Selected")
+            self.course_title_lbl.config(text="Error: No Course ID provided")
+
+    def _create_scrollable_area(self, parent_tab):
+        """Creates a canvas, scrollbar, and inner frame for scrolling."""
+        canvas = tk.Canvas(parent_tab, bg=COLORS["background"], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(parent_tab, orient="vertical", command=canvas.yview)
+
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Inner Frame
+        content_frame = tk.Frame(canvas, bg=COLORS["background"], padx=20, pady=20)
+        
+        # Window
+        canvas_window = canvas.create_window((0, 0), window=content_frame, anchor="nw")
+
+        # Bindings
+        content_frame.bind("<Configure>", 
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        
+        canvas.bind("<Configure>", 
+            lambda e: canvas.itemconfig(canvas_window, width=e.width))
+
+        # [IMPROVEMENT] Use the robust binding method
+        self._setup_scroll_bindings(canvas)
+        
+        return canvas, content_frame
+
+    # --- ROBUST SCROLLING LOGIC (Same as Catalog) ---
+    def _setup_scroll_bindings(self, canvas_widget):
+        """Attaches robust scroll listeners to a canvas."""
+        canvas_widget.bind('<Enter>', lambda e: self._bind_mousewheel(canvas_widget))
+        canvas_widget.bind('<Leave>', lambda e: self._unbind_mousewheel(canvas_widget))
+
+    def _bind_mousewheel(self, widget):
+        self.active_scroll_widget = widget # Track which widget is active
+        widget.bind_all("<MouseWheel>", self._on_mousewheel)
+        widget.bind_all("<Button-4>", self._on_mousewheel)
+        widget.bind_all("<Button-5>", self._on_mousewheel)
+
+    def _unbind_mousewheel(self, widget):
+        widget.unbind_all("<MouseWheel>")
+        widget.unbind_all("<Button-4>")
+        widget.unbind_all("<Button-5>")
+        self.active_scroll_widget = None
+
+    def _on_mousewheel(self, event):
+        if not hasattr(self, 'active_scroll_widget') or not self.active_scroll_widget:
+            return
+
+        try:
+            if not self.active_scroll_widget.winfo_exists():
+                return
+            
+            # Windows/Mac
+            if event.delta:
+                self.active_scroll_widget.yview_scroll(int(-1*(event.delta/120)), "units")
+            # Linux
+            elif event.num == 5:
+                self.active_scroll_widget.yview_scroll(1, "units")
+            elif event.num == 4:
+                self.active_scroll_widget.yview_scroll(-1, "units")
+        except tk.TclError:
+            pass
+
+    def destroy(self):
+        """Clean up bindings on destroy."""
+        self._unbind_mousewheel(self)
+        super().destroy()
 
     def update_ui(self, data):
+        if not data:
+            messagebox.showerror("Error", "Could not load classroom data.")
+            return
+
         course = data.get("course")
         assignments = data.get("assignments", [])
         announcements = data.get("announcements", [])
 
+        # Update Header
         if course:
             title = getattr(course, "name", "Course")
             code = getattr(course, "code", "")
             self.course_title_lbl.config(text=f"{code} - {title}")
 
-        # Stream Tab
-        for w in self.tab_stream.winfo_children(): w.destroy()
-        tk.Label(self.tab_stream, text="Announcements", font=FONTS["h2"], bg="white").pack(anchor="w", pady=(0,10))
-        
-        if not announcements:
-            self._create_empty_state(self.tab_stream, "No announcements yet.")
-        else:
-            for ann in announcements: self._create_announcement_card(ann)
+        # --- Render Stream ---
+        self._render_stream(announcements)
 
-        # Classwork Tab
-        for w in self.tab_classwork.winfo_children(): w.destroy()
-        tk.Label(self.tab_classwork, text="Assignments", font=FONTS["h2"], bg="white").pack(anchor="w", pady=(0,10))
+        # --- Render Classwork ---
+        self._render_classwork(assignments)
+
+    def _render_stream(self, announcements):
+        # Clear previous items
+        for w in self.stream_content.winfo_children(): w.destroy()
+        
+        tk.Label(self.stream_content, text="Latest Announcements", font=FONTS["h2"], 
+                 bg=COLORS["background"], fg=COLORS["primary"]).pack(anchor="w", pady=(0,15))
+
+        if not announcements:
+            self._create_empty_state(self.stream_content, "No announcements posted yet.")
+            return
+
+        for ann in announcements: 
+            self._create_announcement_card(ann)
+
+    def _render_classwork(self, assignments):
+        # Clear previous items
+        for w in self.classwork_content.winfo_children(): w.destroy()
+
+        tk.Label(self.classwork_content, text="Assignments & Tasks", font=FONTS["h2"], 
+                 bg=COLORS["background"], fg=COLORS["primary"]).pack(anchor="w", pady=(0,15))
 
         if not assignments:
-            self._create_empty_state(self.tab_classwork, "No assignments yet.")
-        else:
-            for asm in assignments: self._create_assignment_row(asm)
+            self._create_empty_state(self.classwork_content, "No assignments due.")
+            return
 
-    # ... Helper methods (create_row, etc.) remain the same ...
+        for asm in assignments: 
+            self._create_assignment_row(asm)
+
     def _create_empty_state(self, parent, message):
-        tk.Label(parent, text=message, font=FONTS["body"], fg="gray", bg="white").pack(pady=20)
+        frame = tk.Frame(parent, bg=COLORS["background"], pady=40)
+        frame.pack(fill="x")
+        tk.Label(frame, text=message, font=FONTS["body"], fg=COLORS["placeholder"], bg=COLORS["background"]).pack()
 
     def _create_announcement_card(self, data):
-        tk.Label(self.tab_stream, text=data.get('message', 'Msg'), bg="white").pack()
+        card = tk.Frame(self.stream_content, bg=COLORS["surface"], bd=0, padx=20, pady=20)
+        card.pack(fill="x", pady=(0, 15)) 
+        
+        # Subtle border
+        tk.Frame(card, bg="#e0e0e0", height=1).pack(side="bottom", fill="x")
+
+        # Header
+        header = tk.Frame(card, bg=COLORS["surface"])
+        header.pack(fill="x", pady=(0, 10))
+
+        title_text = data.get('title', 'Announcement')
+        tk.Label(header, text=title_text, font=FONTS["h2"], bg=COLORS["surface"], fg=COLORS["primary"]).pack(side="left")
+
+        raw_date = str(data.get('created_at', ''))
+        date_text = raw_date.replace('T', ' ')[:16] 
+        tk.Label(header, text=date_text, font=FONTS["small"], bg=COLORS["surface"], fg=COLORS["placeholder"]).pack(side="right")
+
+        # Body
+        msg_text = data.get('message', '')
+        tk.Label(card, text=msg_text, font=FONTS["body"], bg=COLORS["surface"], fg=COLORS["text"], 
+                 justify="left", anchor="w", wraplength=700).pack(fill="x")
 
     def _create_assignment_row(self, asm):
-        row = tk.Frame(self.tab_classwork, bg="white", pady=5)
-        row.pack(fill="x")
+        # Add to self.classwork_content
+        row = tk.Frame(self.classwork_content, bg=COLORS["surface"], padx=15, pady=15)
+        row.pack(fill="x", pady=(0, 10))
         
-        # 1. Safely get attributes (handles if asm is a dict or an object)
-        # We try to get 'id', defaulting to None if it's missing
-        asm_id = asm.get("id")
+        # [IMPROVEMENT] Add border
+        row.configure(highlightbackground=COLORS["placeholder"], highlightthickness=1)
+        
+        info_frame = tk.Frame(row, bg=COLORS["surface"])
+        info_frame.pack(side="left", fill="x", expand=True)
 
-        type_str = asm.get("type", "Assignment").title()
         title = asm.get("title", "Untitled")
-        due = asm.get("due_date", "")
         status = asm.get("status", "Pending")
         
-        tk.Label(row, text=f"[{type_str}] {title} ({status})", font=FONTS["body"], bg="white").pack(side="left")
-        tk.Label(row, text=due, font=FONTS["small"], fg="gray", bg="white").pack(side="right", padx=10)
-        
-        # 2. THE FIX: Add the command with a lambda
-        # We use 'a=asm_id' to "freeze" the correct ID for this specific button.
-        # If you don't use 'a=asm_id', every button might open the last assignment!
-        btn = ttk.Button(row, text="Open", style="Secondary.TButton",
-                   command=lambda a=asm_id: self.controller.open_assignment_details(a))
-        btn.pack(side="right")
-        
-        # Separator
-        tk.Frame(self.tab_classwork, bg="#ecf0f1", height=1).pack(fill="x")
+        tk.Label(info_frame, text=title, font=FONTS["body_bold"], bg=COLORS["surface"], fg=COLORS["text"]).pack(anchor="w")
+
+        status_fg = COLORS["placeholder"]
+        s_lower = status.lower()
+        if "graded" in s_lower: status_fg = COLORS["success"]
+        elif "overdue" in s_lower or "missing" in s_lower: status_fg = COLORS["danger"]
+        elif "submitted" in s_lower: status_fg = COLORS["secondary"]
+
+        tk.Label(info_frame, text=f"Status: {status}", font=FONTS["small_bold"], bg=COLORS["surface"], fg=status_fg).pack(anchor="w")
+
+        action_frame = tk.Frame(row, bg=COLORS["surface"])
+        action_frame.pack(side="right")
+
+        due = asm.get("due_date", "")
+        if due:
+            tk.Label(action_frame, text=f"Due: {due}", font=FONTS["small"], 
+                     bg=COLORS["surface"], fg=COLORS["placeholder"]).pack(side="left", padx=15)
+
+        asm_id = asm.get("id")
+        ttk.Button(action_frame, text="View Details", style="Secondary.TButton",
+                   command=lambda a=asm_id: self.controller.open_assignment_details(a)).pack(side="left")

@@ -9,7 +9,7 @@ class Student(User):
         self,
         id, username, name, email, gender, password_hash,
         level, birthdate, major,
-        user_id=None, # Made Optional for creation phase
+        user_id=None, 
         student_profile_id=None
     ):
         # 1. Initialize Parent

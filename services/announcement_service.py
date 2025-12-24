@@ -22,7 +22,6 @@ class AnnouncementService(BaseService):
         self.course_repo = CourseRepository()
         self.notification_repo = NotificationRepository()
         
-        # Inject Notification Service
         self.notification_service = NotificationService()
 
     def create_announcement(self, instructor_id: int, course_id: int, title: str, message: str) -> Optional[Announcement]:
@@ -71,7 +70,6 @@ class AnnouncementService(BaseService):
         Returns a list of dictionaries (optimized for View).
         """
         try:
-            # Uses the OPTIMIZED join method from the Notification repo
             return self.notification_repo.get_dashboard_notifications(student_id)
         except Exception as e:
             self.handle_db_error(e)
@@ -98,7 +96,6 @@ class AnnouncementService(BaseService):
                 raise ValueError("Announcement not found.")
 
             # 2. Verify Course Owner Permission
-            # We must look up the course to see if this instructor owns it
             course = self.course_repo.get_by_id(announcement.course_id)
             if course:
                 self.check_permission(course.instructor_id, instructor_id)
@@ -131,7 +128,6 @@ class AnnouncementService(BaseService):
                 self.check_permission(course.instructor_id, instructor_id)
 
             # 3. CLEANUP: Delete associated notifications first
-            # We don't want orphaned notifications pointing to a deleted announcement.
             self.notification_repo.delete_by_announcement(announcement_id)
 
             # 4. Delete the announcement

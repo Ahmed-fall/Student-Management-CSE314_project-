@@ -8,12 +8,10 @@ class User(BaseModel):
     Matches schema: id, username, name, email, gender, password, role.
     """
     
-    # 🌟 CORRECTION: ALLOWED_ROLES defined as a Class Constant 
     ALLOWED_ROLES = {"student", "instructor", "admin"} 
     ALLOWED_GENDERS = {"male", "female", "engineer"} 
     
     def __init__(self, id, username, name, email, gender, role, password_hash=None):
-        """Initializes and VALIDATES all data immediately using setters."""
         self.id = id
         self._password_hash = password_hash 
         self.username = username
@@ -50,7 +48,7 @@ class User(BaseModel):
     
     @property
     def password_hash(self):
-        return self._password_hash # Note: This getter is present in the provided source
+        return self._password_hash 
 
     # --- Setters (Validation Logic) ---
 
