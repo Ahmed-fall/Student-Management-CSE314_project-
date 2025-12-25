@@ -15,6 +15,8 @@ class BaseView(tk.Frame, ABC):
         self.router = router
         # We allow passing data (like user_id) to views via *args
         self.view_args = args 
+
+        self.kwargs = kwargs
         
         # Every View must have a Controller
         self.controller = self.create_controller()

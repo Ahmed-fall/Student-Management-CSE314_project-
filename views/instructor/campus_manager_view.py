@@ -10,59 +10,141 @@ class CampusManagerView(BaseView):
         return InstructorController(self.router)
 
     def setup_ui(self):
-        # 1. Main Layout
+        # --- 0. Global Style Configuration for Treeview ---
+        self._configure_treeview_style()
+
+        # --- 1. Main Layout ---
         self.main_layout = tk.Frame(self, bg=COLORS["background"])
         self.main_layout.pack(fill="both", expand=True)
 
-        Sidebar(self.main_layout, self.controller).pack(side="left", fill="y")
+        # Sidebar (Left)
+        self.sidebar = Sidebar(self.main_layout, self.controller)
+        self.sidebar.pack(side="left", fill="y")
 
-        self.content = tk.Frame(self.main_layout, bg=COLORS["background"], padx=30, pady=30)
+        # Content Area (Right)
+        self.content = tk.Frame(self.main_layout, bg=COLORS["background"], padx=40, pady=40)
         self.content.pack(side="right", fill="both", expand=True)
 
+        # --- 2. Header Section ---
         header_frame = tk.Frame(self.content, bg=COLORS["background"])
-        header_frame.pack(fill="x", pady=(0, 20))
+        header_frame.pack(fill="x", pady=(0, 25))
 
-        tk.Label(header_frame, text="🏫 Campus Manager", font=FONTS["h1"], 
+        # Title
+        tk.Label(header_frame, text="Campus Manager", font=FONTS["h1"], 
                  bg=COLORS["background"], fg=COLORS["primary"]).pack(side="left")
 
-        # The Refresh Button
-        tk.Button(header_frame, text="🔄 Refresh", font=FONTS["small_bold"],
-                  bg=COLORS["background"], command=self.refresh_unassigned_list).pack(side="right")
+        # Refresh Button (Styled)
+        tk.Button(header_frame, text="🔄 Refresh List", font=FONTS["button"],
+                  bg="white", fg=COLORS["text"], relief="flat", padx=15, pady=8, cursor="hand2",
+                  command=self.refresh_unassigned_list).pack(side="right")
 
-        # --- SECTION 1: CREATE NEW COURSE ---
-        create_frame = tk.LabelFrame(self.content, text=" Create a New Course ", bg="white", padx=15, pady=15)
-        create_frame.pack(fill="x", pady=(0, 20))
+        # --- 3. "Create New Course" Card ---
+        # We use a frame with a highlightthickness to simulate a border
+        create_card = tk.Frame(self.content, bg="white", padx=25, pady=25)
+        create_card.pack(fill="x", pady=(0, 30))
+        create_card.config(highlightbackground="#E0E0E0", highlightthickness=1)
 
-        tk.Label(create_frame, text="Course Code (e.g., CS101):", bg="white").grid(row=0, column=0, sticky="w")
-        self.code_ent = tk.Entry(create_frame)
-        self.code_ent.grid(row=0, column=1, padx=10, pady=5)
+        # Card Title
+        tk.Label(create_card, text="✨ Create a New Course", font=FONTS["h2"], 
+                 bg="white", fg=COLORS["text"]).pack(anchor="w", pady=(0, 20))
 
-        tk.Label(create_frame, text="Course Name:", bg="white").grid(row=0, column=2, sticky="w", padx=(20, 0))
-        self.name_ent = tk.Entry(create_frame)
-        self.name_ent.grid(row=0, column=3, padx=10, pady=5)
+        # Input Grid
+        input_frame = tk.Frame(create_card, bg="white")
+        input_frame.pack(fill="x")
 
-        tk.Button(create_frame, text="✨ Initialize Course", bg=COLORS["secondary"], fg="white",
-                  command=self.handle_create_course).grid(row=0, column=4, padx=20)
-
-        # --- SECTION 2: ENROLL IN EXISTING COURSE ---
-        enroll_frame = tk.LabelFrame(self.content, text=" Available Unassigned Courses ", bg="white", padx=15, pady=15)
-        enroll_frame.pack(fill="both", expand=True)
-
-        columns = ("id", "code", "name")
-        self.tree = ttk.Treeview(enroll_frame, columns=columns, show="headings")
-        self.tree.heading("id", text="ID")
-        self.tree.heading("code", text="Code")
-        self.tree.heading("name", text="Course Name")
-        self.tree.pack(fill="both", expand=True, pady=10)
-
-        tk.Button(enroll_frame, text="🙋‍♂️ Claim Teaching Rights", bg=COLORS["primary"], fg="white",
-                  command=self.handle_claim_course).pack(anchor="e")
+        # Col 0: Code Label
+        tk.Label(input_frame, text="Course Code", font=("Arial", 9, "bold"), 
+                 fg="gray", bg="white").grid(row=0, column=0, sticky="w")
         
-        # Load the data after the UI is fully built
+        # Col 1: Name Label
+        tk.Label(input_frame, text="Course Name", font=("Arial", 9, "bold"), 
+                 fg="gray", bg="white").grid(row=0, column=1, sticky="w", padx=20)
+
+        # Row 1: Inputs
+        self.code_ent = tk.Entry(input_frame, font=FONTS["body"], bg="#F9F9F9", 
+                                 relief="flat", highlightthickness=1, highlightbackground="#DDD", width=15)
+        self.code_ent.grid(row=1, column=0, sticky="w", pady=(5,0), ipady=8)
+
+        self.name_ent = tk.Entry(input_frame, font=FONTS["body"], bg="#F9F9F9", 
+                                 relief="flat", highlightthickness=1, highlightbackground="#DDD", width=40)
+        self.name_ent.grid(row=1, column=1, sticky="w", padx=20, pady=(5,0), ipady=8)
+
+        # Action Button
+        tk.Button(input_frame, text="Initialize Course", bg=COLORS["secondary"], fg="white", 
+                  font=FONTS["button"], relief="flat", padx=20, pady=8, cursor="hand2",
+                  command=self.handle_create_course).grid(row=1, column=2, sticky="e", pady=(5,0))
+
+
+        # --- 4. "Available Courses" Section ---
+        
+        # Section Header
+        tk.Label(self.content, text="Unassigned Courses", font=FONTS["h2"], 
+                 bg=COLORS["background"], fg=COLORS["text"]).pack(anchor="w", pady=(0, 10))
+        
+        # Table Container (Card style)
+        table_card = tk.Frame(self.content, bg="white", padx=2, pady=2) # Thin border wrapper
+        table_card.pack(fill="both", expand=True)
+        table_card.config(highlightbackground="#E0E0E0", highlightthickness=1)
+
+        # Scrollbar and Treeview container
+        tree_frame = tk.Frame(table_card, bg="white")
+        tree_frame.pack(fill="both", expand=True)
+
+        # Scrollbar
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical")
+        scrollbar.pack(side="right", fill="y")
+
+        # Treeview
+        columns = ("id", "code", "name")
+        self.tree = ttk.Treeview(tree_frame, columns=columns, show="headings", 
+                                 yscrollcommand=scrollbar.set, selectmode="browse", style="Custom.Treeview")
+        
+        self.tree.heading("id", text="ID")
+        self.tree.heading("code", text="CODE")
+        self.tree.heading("name", text="COURSE NAME")
+        
+        self.tree.column("id", width=50, anchor="center")
+        self.tree.column("code", width=100, anchor="center")
+        self.tree.column("name", width=400, anchor="w")
+
+        self.tree.pack(fill="both", expand=True)
+        scrollbar.config(command=self.tree.yview)
+
+        # Claim Button (Bottom Right)
+        btn_frame = tk.Frame(self.content, bg=COLORS["background"], pady=15)
+        btn_frame.pack(fill="x")
+
+        tk.Button(btn_frame, text="🙋‍♂️ Claim Selected Course", bg=COLORS["primary"], fg="white",
+                  font=FONTS["button"], relief="flat", padx=20, pady=10, cursor="hand2",
+                  command=self.handle_claim_course).pack(side="right")
+
+        # Load Initial Data
         self.refresh_unassigned_list()
 
+    def _configure_treeview_style(self):
+        """Sets up a modern looking table style."""
+        style = ttk.Style()
+        style.theme_use("clam") # 'clam' usually allows for better color customization than 'vista'
+        
+        # Heading Style
+        style.configure("Custom.Treeview.Heading", 
+                        font=("Helvetica", 10, "bold"), 
+                        background="#f0f0f0", 
+                        foreground="#333", 
+                        relief="flat")
+        
+        # Row Style
+        style.configure("Custom.Treeview", 
+                        font=("Helvetica", 11),
+                        rowheight=35, # Taller rows
+                        background="white", 
+                        fieldbackground="white",
+                        borderwidth=0)
+        
+        # Selection Color
+        style.map("Custom.Treeview", background=[("selected", COLORS["primary"])])
+
     def handle_create_course(self):
-        """Gathers input and triggers the controller's creation logic."""
         code = self.code_ent.get().strip()
         name = self.name_ent.get().strip()
         
@@ -73,39 +155,41 @@ class CampusManagerView(BaseView):
         self.controller.create_new_course(code, name, self.on_success)
 
     def handle_claim_course(self):
-        """Assigns the instructor to an existing course"""
         selected = self.tree.selection()
         if not selected:
-            messagebox.showwarning("Selection", "Choose a course to claim.")
+            messagebox.showwarning("Selection", "Please select a course from the list to claim.")
             return
             
         course_id = self.tree.item(selected[0], "values")[0]
-        # Ensure the controller has this method re-added!
         self.controller.claim_teaching_rights(course_id, self.on_success)
 
     def on_success(self, result):
-        """Standard callback for successful database actions."""
         if result:
             messagebox.showinfo("Success", "Action completed successfully!")
-            self.router.navigate("instructor_dashboard")
+            # Clear inputs
+            self.code_ent.delete(0, tk.END)
+            self.name_ent.delete(0, tk.END)
+            # Refresh list
+            self.refresh_unassigned_list()
 
     def refresh_unassigned_list(self):
-        """Calls the controller to get unassigned courses."""
         self.controller.load_unassigned_courses(self.render_unassigned_table)
 
     def render_unassigned_table(self, courses):
-        """Populates the Treeview with safety checks."""
-        # Safety check: Avoid AttributeError if UI is still loading
-        if not hasattr(self, 'tree'):
-            return
+        if not hasattr(self, 'tree'): return
 
-        # Clear the table
+        # Clear table
         for item in self.tree.get_children():
             self.tree.delete(item)
             
         if not courses:
             return
 
-        for c in courses:
-            # Use course object attributes
-            self.tree.insert("", "end", values=(c.id, c.code, c.name))
+        for i, c in enumerate(courses):
+            # Alternating row colors (Striping)
+            tag = "even" if i % 2 == 0 else "odd"
+            self.tree.insert("", "end", values=(c.id, c.code, c.name), tags=(tag,))
+
+        # Configure the tags for striping
+        self.tree.tag_configure("even", background="white")
+        self.tree.tag_configure("odd", background="#F9FAFB") # Very light gray

@@ -172,7 +172,6 @@ class StudentCatalogView(BaseView):
         action_frame.pack(side="right", padx=(20, 0))
 
         if is_enrolled:
-            # [IMPROVEMENT] Better looking 'Enrolled' badge
             badge_frame = tk.Frame(action_frame, bg="#e8f5e9", padx=10, pady=5)
             badge_frame.pack()
             badge_frame.configure(highlightbackground=COLORS["success"], highlightthickness=1)

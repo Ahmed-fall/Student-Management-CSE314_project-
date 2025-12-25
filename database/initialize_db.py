@@ -95,7 +95,7 @@ def create_tables():
         student_id INTEGER NOT NULL,
         content TEXT,
         submitted_at TEXT,
-        FOREIGN KEY (assignment_id) REFERENCES assignments(id),
+        FOREIGN KEY (assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
         FOREIGN KEY (student_id) REFERENCES students(id)
     );
     """)
@@ -106,7 +106,7 @@ def create_tables():
         submission_id INTEGER NOT NULL,
         grade_value REAL NOT NULL,
         feedback TEXT,
-        FOREIGN KEY (submission_id) REFERENCES submissions(id)
+        FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE
     );
     """)
 
