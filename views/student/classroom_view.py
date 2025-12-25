@@ -98,12 +98,10 @@ class ClassroomView(BaseView):
         canvas.bind("<Configure>", 
             lambda e: canvas.itemconfig(canvas_window, width=e.width))
 
-        # [IMPROVEMENT] Use the robust binding method
         self._setup_scroll_bindings(canvas)
         
         return canvas, content_frame
 
-    # --- ROBUST SCROLLING LOGIC (Same as Catalog) ---
     def _setup_scroll_bindings(self, canvas_widget):
         """Attaches robust scroll listeners to a canvas."""
         canvas_widget.bind('<Enter>', lambda e: self._bind_mousewheel(canvas_widget))
@@ -227,7 +225,6 @@ class ClassroomView(BaseView):
         row = tk.Frame(self.classwork_content, bg=COLORS["surface"], padx=15, pady=15)
         row.pack(fill="x", pady=(0, 10))
         
-        # [IMPROVEMENT] Add border
         row.configure(highlightbackground=COLORS["placeholder"], highlightthickness=1)
         
         info_frame = tk.Frame(row, bg=COLORS["surface"])

@@ -25,7 +25,8 @@ FONTS = {
     "small": ("Helvetica", 10),
     "small_bold": ("Helvetica", 10, "bold"),
     "icon": ("Segoe UI Emoji", 14),
-    "button": ("Helvetica", 11, "bold") 
+    "button": ("Helvetica", 11, "bold") ,
+    "caption": ("Helvetica", 10, "italic")
 }
 
 LAYOUT = {

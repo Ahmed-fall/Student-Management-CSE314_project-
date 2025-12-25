@@ -36,11 +36,9 @@ class InstructorController(BaseController):
             assignment_service = self.get_service(AssignmentService)
             
             # 1. Get Course details
-            course = course_service.course_repo.get_by_id(course_id)
-            
+            course = course_service.get_course_by_id(course_id)            
             # 2. Get all assignments for this specific course
-            assignments = assignment_service.assignment_repo.get_by_course_id(course_id)
-            
+            assignments = assignment_service.get_assignments_by_course(course_id)            
             return {
                 "course": course,
                 "assignments": assignments
@@ -49,19 +47,23 @@ class InstructorController(BaseController):
         self.run_async(task, callback)
 
     def delete_assignment(self, assignment_id, callback):
-        """
-        Allows an instructor to remove an assignment.
-        Calls the AssignmentService to handle cleanup (like deleting notifications).
-        """
+        """Allows an instructor to remove an assignment."""
         user = Session.current_user
         if not user: return
 
         def task():
+            # 1. Resolve User ID -> Instructor Profile ID
+            inst_service = self.get_service(InstructorService)
+            profile = inst_service.get_instructor_profile(user.id)
+            if not profile: 
+                 raise ValueError("Instructor profile not found.")
+
+            # 2. Call Service
             service = self.get_service(AssignmentService)
-            # Service handles permission checks and secondary cleanup
-            return service.delete_assignment(assignment_id)
+            return service.delete_assignment(profile.instructor_profile_id, assignment_id)
 
         self.run_async(task, callback)
+
 
     def submit_grade(self, submission_id, grade_value, feedback, callback):
         """
@@ -170,15 +172,11 @@ class InstructorController(BaseController):
     def manage_course(self, course_id):
         """Navigate to editor with the CORRECT course_id."""
         # Store the current course context in the controller or pass via router
-        self.current_course_id = course_id 
-        self.navigate("course_editor")
+        self.navigate("course_editor", course_id=course_id)
 
     def open_course_editor(self, course_id):
             """Sets the 'Active' course before navigating."""
-            # 1. Store the ID so the Editor knows which course we are talking about
-            self.current_managed_course_id = course_id 
-            # 2. Navigate to the view
-            self.navigate("course_editor")
+            self.navigate("course_editor", course_id=course_id)
 
     def drop_teaching_course(self, course_id, callback):
         """Calls the new Drop logic in the Service."""
@@ -225,10 +223,20 @@ class InstructorController(BaseController):
     def load_assignment_submissions(self, assignment_id, callback):
             """Fetches the list of students who submitted work for an assignment."""
             def task():
-                # Access the repository directly for this specific report query
-                repo = self.get_service(AssignmentService).submission_repo
-                return repo.get_grading_queue(assignment_id)
+                service = self.get_service(AssignmentService)
+                return service.submission_repo.get_grading_queue(assignment_id)
             
             self.run_async(task, callback)
 
-   
+    def get_course_details(self, course_id, callback):
+        """Fetches course data for the Editor View."""
+        def task():
+             return self.get_service(CourseService).get_course_by_id(course_id)
+        self.run_async(task, callback)
+
+    def update_course_details(self, course_id, data, callback):
+        """Sends updated data (Capacity/Description) to the Service."""
+        def task():
+            service = self.get_service(CourseService)
+            return service.update_course(course_id, data)
+        self.run_async(task, callback)

@@ -39,7 +39,6 @@ class StudentAssignmentsView(BaseView):
         # Scrollbar
         self.scrollbar = ttk.Scrollbar(self.table_card, orient="vertical")
         
-        # [CRITICAL FIX] Added style="Primary.Treeview"
         self.tree = ttk.Treeview(self.table_card, columns=columns, show="headings", 
                                  height=15, selectmode="browse", 
                                  style="Primary.Treeview",       # <--- THIS FIXES THE COLORS

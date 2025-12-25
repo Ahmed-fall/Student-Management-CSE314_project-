@@ -92,13 +92,11 @@ class StudentNotificationsView(BaseView):
         # Bind Double Click for Details
         self.tree.bind("<Double-1>", self.on_double_click)
 
-        # [NEW] Robust Mousewheel Support
         self._setup_scroll_bindings(self.tree)
 
         # Initial Load
         self.controller.load_notifications(self.update_list)
 
-    # --- ROBUST SCROLLING LOGIC ---
     def _setup_scroll_bindings(self, widget):
         widget.bind('<Enter>', lambda e: self._bind_mousewheel(widget))
         widget.bind('<Leave>', lambda e: self._unbind_mousewheel(widget))

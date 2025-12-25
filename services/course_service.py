@@ -15,14 +15,6 @@ class CourseService(BaseService):
         self.course_repo = CourseRepository()
         self.enrollment_repo = EnrollmentRepository()
 
-    def drop_course(self, course_id: int) -> bool:
-            """Logic to allow an instructor to stop teaching a course."""
-            try:
-                self.course_repo.unassign_instructor(course_id)
-                return True
-            except Exception as e:
-                self.handle_db_error(e)
-                return False
         
     # ---------------------------------------------------------
     # 1. INSTRUCTOR ACTIONS (The "Missing" Methods)
@@ -58,6 +50,28 @@ class CourseService(BaseService):
 
         except Exception as e:
             self.handle_db_error(e)
+    
+    def update_course(self, course_id: int, data: dict) -> bool:
+        """Updates description and capacity."""
+        try:
+            course = self.course_repo.get_by_id(course_id)
+            if not course:
+                return False
+            
+            if 'description' in data:
+                course.description = data['description']
+            
+            if 'max_students' in data:
+                try:
+                    course.max_students = int(data['max_students'])
+                except ValueError:
+                    pass 
+
+            self.course_repo.update(course)
+            return True
+        except Exception as e:
+            self.handle_db_error(e)
+            return False
 
     def get_courses_by_instructor(self, instructor_id: int):
         """

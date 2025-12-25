@@ -17,32 +17,41 @@ class InstructorGradingView(BaseView):
         return controller
 
     def setup_ui(self):
-        # --- Layout ---
+        # --- Main Layout ---
         self.main_layout = tk.Frame(self, bg=COLORS["background"])
         self.main_layout.pack(fill="both", expand=True)
 
+        # Sidebar
         self.sidebar = Sidebar(self.main_layout, self.controller)
         self.sidebar.pack(side="left", fill="y")
 
+        # Content Area
         self.content = tk.Frame(self.main_layout, bg=COLORS["background"], padx=20, pady=20)
         self.content.pack(side="right", fill="both", expand=True)
 
-        # Title
+        # Page Title
         tk.Label(self.content, text="📝 Grading & Assignment Center", font=FONTS["h1"], 
                  bg=COLORS["background"], fg=COLORS["primary"]).pack(anchor="w", pady=(0, 10))
 
-        # --- STEP 1: Assignments List ---
+        # =================================================================
+        # SECTION 1: ASSIGNMENTS LIST
+        # =================================================================
         
-        # Header Container (Label + Button)
+        # Header Container (Label + Buttons)
         top_header = tk.Frame(self.content, bg=COLORS["background"])
         top_header.pack(fill="x", pady=(0, 5))
 
         tk.Label(top_header, text="Step 1: Select an Assignment", font=FONTS["h2"], bg=COLORS["background"]).pack(side="left")
         
-        # [NEW] Create Assignment Button
-        tk.Button(top_header, text="➕ New Assignment", 
-                  command=self.open_assignment_popup,
-                  bg=COLORS["secondary"], fg="white", font=FONTS["small_bold"]).pack(side="right")
+        # Action Buttons (Delete & New)
+        btn_frame = tk.Frame(top_header, bg=COLORS["background"])
+        btn_frame.pack(side="right")
+
+        tk.Button(btn_frame, text="🗑️ Delete Selected", command=self.handle_delete_assignment,
+                  bg=COLORS["danger"], fg="white", font=FONTS["small"]).pack(side="left", padx=(0, 10))
+
+        tk.Button(btn_frame, text="➕ New Assignment", command=self.open_assignment_popup,
+                  bg=COLORS["secondary"], fg="white", font=FONTS["small_bold"]).pack(side="left")
 
         # Assignment Table
         assign_frame = tk.Frame(self.content, bg="white", height=150)
@@ -57,14 +66,15 @@ class InstructorGradingView(BaseView):
         self.assign_tree.column("due", width=150, anchor="center")
         self.assign_tree.pack(side="left", fill="both", expand=True)
         
-        # Bind Click Event
         self.assign_tree.bind("<<TreeviewSelect>>", self.on_assignment_select)
 
-        # --- STEP 2 & 3 Container ---
+        # =================================================================
+        # SPLIT VIEW: SUBMISSIONS (Left) & GRADING (Right)
+        # =================================================================
         bottom_frame = tk.Frame(self.content, bg=COLORS["background"])
         bottom_frame.pack(fill="both", expand=True, pady=20)
 
-        # --- STEP 2: Submissions List (Left) ---
+        # --- SECTION 2: SUBMISSIONS LIST (Left) ---
         sub_container = tk.Frame(bottom_frame, bg=COLORS["background"])
         sub_container.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
@@ -79,31 +89,42 @@ class InstructorGradingView(BaseView):
         
         self.sub_tree.bind("<<TreeviewSelect>>", self.on_submission_select)
 
-        # --- STEP 3: Grading Form (Right) ---
+        # --- SECTION 3: GRADING FORM & WORK DISPLAY (Right) ---
         grade_container = tk.Frame(bottom_frame, bg="white", padx=20, pady=20, relief="raised")
-        grade_container.pack(side="right", fill="y", ipadx=20)
+        grade_container.pack(side="right", fill="both", expand=True, ipadx=10)
 
-        tk.Label(grade_container, text="Step 3: Grade Work", font=FONTS["h2"], bg="white", fg=COLORS["primary"]).pack(pady=(0,20))
+        tk.Label(grade_container, text="Step 3: Grade Work", font=FONTS["h2"], bg="white", fg=COLORS["primary"]).pack(pady=(0,15))
 
-        tk.Label(grade_container, text="Score (0-100):", bg="white").pack(anchor="w")
+        # [NEW FEATURE] Student Work Display
+        tk.Label(grade_container, text="Student's Submitted Work:", bg="white", font=FONTS["small_bold"]).pack(anchor="w")
+        
+        # Text widget is DISABLED by default so instructor cannot edit student's work accidentally
+        self.work_display = tk.Text(grade_container, height=10, width=40, font=FONTS["body"], bg="#f9f9f9", state="disabled")
+        self.work_display.pack(fill="both", expand=True, pady=(0, 15))
+
+        # Score Input
+        tk.Label(grade_container, text="Score (0-100):", bg="white", font=FONTS["small_bold"]).pack(anchor="w")
         self.score_ent = tk.Entry(grade_container, font=FONTS["body"])
         self.score_ent.pack(fill="x", pady=(0, 10))
 
-        tk.Label(grade_container, text="Feedback:", bg="white").pack(anchor="w")
-        self.feedback_ent = tk.Text(grade_container, height=5, width=30, font=FONTS["small"])
-        self.feedback_ent.pack(pady=(0, 20))
+        # Feedback Input
+        tk.Label(grade_container, text="Feedback:", bg="white", font=FONTS["small_bold"]).pack(anchor="w")
+        self.feedback_ent = tk.Text(grade_container, height=4, width=30, font=FONTS["small"])
+        self.feedback_ent.pack(fill="x", pady=(0, 15))
 
+        # Save Button
         tk.Button(grade_container, text="💾 Save Grade", command=self.submit_grade,
-                  bg=COLORS["secondary"], fg="white", font=FONTS["button"]).pack(fill="x")
+                  bg=COLORS["secondary"], fg="white", font=FONTS["button"]).pack(fill="x", side="bottom")
 
         # Initial Load
         self.refresh_assignments()
 
     # ------------------------------------------------------------------
-    # EXISTING LOGIC (Data Loading)
+    # DATA LOADING & SELECTION LOGIC
     # ------------------------------------------------------------------
 
     def refresh_assignments(self):
+        """Reloads assignments from the controller."""
         if self.course_id:
             self.controller.load_course_editor_data(self.course_id, self.update_assignment_list)
         else:
@@ -111,9 +132,8 @@ class InstructorGradingView(BaseView):
             self.router.go_back()
 
     def update_assignment_list(self, data):
-        """Fills the top table."""
+        """Callback to populate the top table."""
         assignments = data.get("assignments", [])
-
         self.assignments_map = {}
 
         for item in self.assign_tree.get_children():
@@ -124,7 +144,7 @@ class InstructorGradingView(BaseView):
             self.assign_tree.insert("", "end", values=(a.id, a.title, a.due_date))
 
     def on_assignment_select(self, event):
-        """When assignment is clicked, load submissions."""
+        """When assignment is clicked, load the submissions queue."""
         selected = self.assign_tree.selection()
         if not selected: return
         
@@ -133,11 +153,14 @@ class InstructorGradingView(BaseView):
 
         self.current_assignment_id = assign_id
         
-        # Call Controller to get submissions
+        # Clear previous student data from UI
+        self.clear_grading_form()
+        
+        # Call Controller
         self.controller.load_assignment_submissions(assign_id, self.update_submission_list)
 
     def update_submission_list(self, submissions):
-        """Fills the bottom-left table."""
+        """Callback to populate the bottom-left table."""
         for item in self.sub_tree.get_children():
             self.sub_tree.delete(item)
             
@@ -149,7 +172,12 @@ class InstructorGradingView(BaseView):
             self.submissions_map[row_id] = sub
 
     def on_submission_select(self, event):
-        """When student is clicked, fill the grading form."""
+        """
+        When a student is selected:
+        1. Fetch data from map.
+        2. Unlock text box -> Write Content -> Lock text box.
+        3. Fill existing grade/feedback.
+        """
         selected = self.sub_tree.selection()
         if not selected: return
         
@@ -158,14 +186,41 @@ class InstructorGradingView(BaseView):
         
         self.current_submission_id = data['submission_id']
         
-        # Fill Form
+        # --- 1. Display Student Work ---
+        self.work_display.config(state="normal") # Enable editing to insert text
+        self.work_display.delete("1.0", tk.END)
+        
+        # 'submission_content' comes from your Repository SQL alias
+        content = data.get('submission_content')
+        if content:
+            self.work_display.insert("1.0", content)
+        else:
+            self.work_display.insert("1.0", "[Student submitted no text content or file]")
+            
+        self.work_display.config(state="disabled") # Disable again
+
+        # --- 2. Fill Grade Form ---
         self.score_ent.delete(0, tk.END)
         if data['grade_value'] is not None:
             self.score_ent.insert(0, str(data['grade_value']))
             
         self.feedback_ent.delete("1.0", tk.END)
-        if data['feedback']:
+        if data.get('feedback'):
             self.feedback_ent.insert("1.0", data['feedback'])
+
+    def clear_grading_form(self):
+        """Helper to clear the right-side panel."""
+        self.work_display.config(state="normal")
+        self.work_display.delete("1.0", tk.END)
+        self.work_display.config(state="disabled")
+        self.score_ent.delete(0, tk.END)
+        self.feedback_ent.delete("1.0", tk.END)
+        if hasattr(self, 'current_submission_id'):
+            del self.current_submission_id
+
+    # ------------------------------------------------------------------
+    # ACTIONS: GRADING & DELETING
+    # ------------------------------------------------------------------
 
     def submit_grade(self):
         if not hasattr(self, 'current_submission_id') or not self.current_submission_id:
@@ -175,116 +230,131 @@ class InstructorGradingView(BaseView):
         score_input = self.score_ent.get().strip()
         feedback = self.feedback_ent.get("1.0", tk.END).strip()
         
-        # 1. Number Validation
+        # Validation
         try:
             score_val = float(score_input)
         except ValueError:
             messagebox.showerror("Error", "Score must be a valid number.")
             return
 
-        # 2. Max Score Validation
         current_assignment = self.assignments_map.get(self.current_assignment_id)
-        
         if current_assignment:
             max_limit = current_assignment.max_score
             if score_val > max_limit:
-                messagebox.showerror("Invalid Grade", f"Score cannot exceed the maximum of {max_limit}.")
+                messagebox.showerror("Invalid Grade", f"Score cannot exceed max of {max_limit}.")
                 return
             if score_val < 0:
                 messagebox.showerror("Invalid Grade", "Score cannot be negative.")
                 return
-        else:
-            print(f"Warning: Could not find assignment ID {self.current_assignment_id} in map.")
 
-        # 3. Submit to Controller
+        # Submit to Controller
         self.controller.submit_grade(self.current_submission_id, score_input, feedback, self.on_grade_success)
-
 
     def on_grade_success(self, result):
         if result:
             messagebox.showinfo("Success", "Grade Saved!")
+            # Refresh the list to show the new grade in the table
             self.controller.load_assignment_submissions(self.current_assignment_id, self.update_submission_list)
 
+    def handle_delete_assignment(self):
+        """Deletes the selected assignment."""
+        selected = self.assign_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select an assignment to delete.")
+            return
+
+        assign_id = int(self.assign_tree.item(selected[0], "values")[0])
+        
+        if messagebox.askyesno("Confirm Delete", "Are you sure? This will delete the assignment and ALL student submissions associated with it."):
+            self.controller.delete_assignment(assign_id, self.on_delete_success)
+
+    def on_delete_success(self, result):
+        if result:
+            messagebox.showinfo("Deleted", "Assignment deleted successfully.")
+            self.refresh_assignments()
+            # Clear the submissions view as the assignment is gone
+            for item in self.sub_tree.get_children(): 
+                self.sub_tree.delete(item)
+            self.clear_grading_form()
+
     # ------------------------------------------------------------------
-    # [NEW] CREATE ASSIGNMENT POPUP LOGIC
+    # POPUP: CREATE ASSIGNMENT
     # ------------------------------------------------------------------
 
     def open_assignment_popup(self):
-            """Opens the form with Dropdown Menus instead of typing."""
-            self.popup = tk.Toplevel(self)
-            self.popup.title("New Assignment")
-            self.popup.geometry("400x500")
-            self.popup.configure(bg=COLORS["background"])
+        """Opens the form with Dropdown Menus."""
+        self.popup = tk.Toplevel(self)
+        self.popup.title("New Assignment")
+        self.popup.geometry("400x550")
+        self.popup.configure(bg=COLORS["background"])
 
-            # 1. Title (Still needs typing)
-            tk.Label(self.popup, text="Assignment Title", bg=COLORS["background"]).pack(pady=(15,0))
-            self.title_ent = tk.Entry(self.popup)
-            self.title_ent.pack(fill="x", padx=20, pady=5)
+        # 1. Title
+        tk.Label(self.popup, text="Assignment Title", bg=COLORS["background"], font=FONTS["small_bold"]).pack(pady=(15,0))
+        self.title_ent = tk.Entry(self.popup)
+        self.title_ent.pack(fill="x", padx=20, pady=5)
 
-            # 2. Description
-            tk.Label(self.popup, text="Description", bg=COLORS["background"]).pack(pady=(10,0))
-            self.desc_ent = tk.Entry(self.popup)
-            self.desc_ent.pack(fill="x", padx=20, pady=5)
+        # 2. Description
+        tk.Label(self.popup, text="Description", bg=COLORS["background"], font=FONTS["small_bold"]).pack(pady=(10,0))
+        self.desc_ent = tk.Entry(self.popup)
+        self.desc_ent.pack(fill="x", padx=20, pady=5)
 
-            # 3. Due Date (NOW A MENU)
-            tk.Label(self.popup, text="Due Date", bg=COLORS["background"]).pack(pady=(10,0))
-            
-            date_frame = tk.Frame(self.popup, bg=COLORS["background"])
-            date_frame.pack(pady=5)
-            
-            # Year Menu
-            years = [str(y) for y in range(2025, 2030)]
-            self.year_var = tk.StringVar(value=years[0])
-            ttk.Combobox(date_frame, textvariable=self.year_var, values=years, width=5, state="readonly").pack(side="left", padx=2)
-            
-            # Month Menu
-            months = [f"{m:02d}" for m in range(1, 13)]
-            self.month_var = tk.StringVar(value=months[0])
-            ttk.Combobox(date_frame, textvariable=self.month_var, values=months, width=3, state="readonly").pack(side="left", padx=2)
-            
-            # Day Menu
-            days = [f"{d:02d}" for d in range(1, 32)]
-            self.day_var = tk.StringVar(value=days[0])
-            ttk.Combobox(date_frame, textvariable=self.day_var, values=days, width=3, state="readonly").pack(side="left", padx=2)
+        # 3. Due Date (Dropdowns)
+        tk.Label(self.popup, text="Due Date", bg=COLORS["background"], font=FONTS["small_bold"]).pack(pady=(10,0))
+        
+        date_frame = tk.Frame(self.popup, bg=COLORS["background"])
+        date_frame.pack(pady=5)
+        
+        years = [str(y) for y in range(2025, 2030)]
+        self.year_var = tk.StringVar(value=years[0])
+        ttk.Combobox(date_frame, textvariable=self.year_var, values=years, width=6, state="readonly").pack(side="left", padx=2)
+        
+        months = [f"{m:02d}" for m in range(1, 13)]
+        self.month_var = tk.StringVar(value=months[0])
+        ttk.Combobox(date_frame, textvariable=self.month_var, values=months, width=4, state="readonly").pack(side="left", padx=2)
+        
+        days = [f"{d:02d}" for d in range(1, 32)]
+        self.day_var = tk.StringVar(value=days[0])
+        ttk.Combobox(date_frame, textvariable=self.day_var, values=days, width=4, state="readonly").pack(side="left", padx=2)
 
-            # 4. Type (Already a Menu)
-            tk.Label(self.popup, text="Type", bg=COLORS["background"]).pack(pady=(10,0))
-            self.type_var = tk.StringVar(value="homework")
-            ttk.Combobox(self.popup, textvariable=self.type_var, 
-                        values=["quiz", "project", "homework", "exam"], state="readonly").pack(pady=5)
+        # 4. Type
+        tk.Label(self.popup, text="Type", bg=COLORS["background"], font=FONTS["small_bold"]).pack(pady=(10,0))
+        self.type_var = tk.StringVar(value="homework")
+        ttk.Combobox(self.popup, textvariable=self.type_var, 
+                     values=["quiz", "project", "homework", "exam"], state="readonly").pack(pady=5)
 
-            # 5. Max Score (NOW A MENU)
-            tk.Label(self.popup, text="Max Score", bg=COLORS["background"]).pack(pady=(10,0))
-            self.score_var = tk.StringVar(value="100")
-            ttk.Combobox(self.popup, textvariable=self.score_var, 
-                        values=["10", "20", "25", "50", "100", "200"], state="readonly").pack(pady=5)
+        # 5. Max Score
+        tk.Label(self.popup, text="Max Score", bg=COLORS["background"], font=FONTS["small_bold"]).pack(pady=(10,0))
+        self.score_var = tk.StringVar(value="100")
+        ttk.Combobox(self.popup, textvariable=self.score_var, 
+                     values=["10", "20", "25", "50", "100", "200"], state="readonly").pack(pady=5)
 
-            # Save Button
-            tk.Button(self.popup, text="✅ Post Assignment", 
-                    command=self.handle_save_assignment,
-                    bg=COLORS["primary"], fg="white", font=FONTS["button"]).pack(pady=30)
+        # Save Button
+        tk.Button(self.popup, text="✅ Post Assignment", 
+                  command=self.handle_save_assignment,
+                  bg=COLORS["primary"], fg="white", font=FONTS["button"]).pack(pady=30)
 
     def handle_save_assignment(self):
-            # 1. Construct the Date from the 3 menus
-            date_str = f"{self.year_var.get()}-{self.month_var.get()}-{self.day_var.get()}"
-            
-            # 2. Gather Data
-            assignment_data = {
-                'title': self.title_ent.get().strip(),
-                'description': self.desc_ent.get().strip(),
-                'due_date': date_str, # Using the menu result
-                'max_score': int(self.score_var.get()), # Using the menu result
-                'type': self.type_var.get()
-            }
+        # Construct Date
+        date_str = f"{self.year_var.get()}-{self.month_var.get()}-{self.day_var.get()}"
+        
+        assignment_data = {
+            'title': self.title_ent.get().strip(),
+            'description': self.desc_ent.get().strip(),
+            'due_date': date_str,
+            'max_score': int(self.score_var.get()),
+            'type': self.type_var.get()
+        }
 
-            # 3. Validate & Send
-            if self.course_id and assignment_data['title']:
-                self.controller.create_assignment(self.course_id, assignment_data, self.on_save_success)
-            else:
-                messagebox.showwarning("Error", "Title is required.")
+        # Validate
+        if not assignment_data['title']:
+            messagebox.showwarning("Error", "Title is required.")
+            return
+
+        # Send to Controller
+        self.controller.create_assignment(self.course_id, assignment_data, self.on_save_success)
 
     def on_save_success(self, result):
         if result:
             messagebox.showinfo("Success", "Assignment Created!")
             self.popup.destroy()
-            self.refresh_assignments() # Updates the list immediately
+            self.refresh_assignments()

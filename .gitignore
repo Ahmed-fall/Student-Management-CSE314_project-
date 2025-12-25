@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 *.db
 student_management.db
+test.py
 .venv/
 venv/
 .DS_Store
