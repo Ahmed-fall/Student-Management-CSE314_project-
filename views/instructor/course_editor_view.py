@@ -65,7 +65,6 @@ class CourseEditorView(BaseView):
                   command=self.router.go_back).pack(side="right", padx=10)
 
         # --- Trigger Data Load ---
-        # We use 'after' to let the UI finish drawing before fetching data
         self.after(100, self.load_data)
 
     def load_data(self):

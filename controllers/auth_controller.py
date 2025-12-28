@@ -4,10 +4,12 @@ from core.session import Session
 
 class AuthController(BaseController):
     
-    # --- Login Logic ---
+    # -------------------------------------------------------------------------
+    # Login Logic
+    # -------------------------------------------------------------------------
     def login(self, username, password, on_fail=None):
         
-        # 1. Validation
+        # 1. Basic Input Validation
         if not username or not password:
             error_msg = "Please enter both username and password."
             if on_fail:
@@ -24,23 +26,26 @@ class AuthController(BaseController):
         # 3. Define what happens when DB finishes
         def on_complete(user):
             if user:
-                # Success: Clear any error messages first
+                # Success: Clear error messages
                 if on_fail: on_fail("") 
 
-                # Update Session
+                # Update Global Session
                 Session.login(user)
                 
                 # Navigate based on Role
-                if user.role == "student":
-                    self.navigate("student_dashboard")
-                elif user.role == "instructor":
-                    self.navigate("instructor_dashboard")
-                elif user.role == "admin":
-                    self.navigate("admin_dashboard")
+                role_map = {
+                    "student": "student_dashboard",
+                    "instructor": "instructor_dashboard",
+                    "admin": "admin_dashboard"
+                }
+                
+                target_view = role_map.get(user.role)
+                if target_view:
+                    self.navigate(target_view)
                 else:
                     self.show_error("Access Denied", f"Role '{user.role}' not supported yet.")
             else:
-                # Failure: Update the View's error label
+                # Failure logic
                 error_msg = "Invalid username or password."
                 if on_fail:
                     on_fail(error_msg)
@@ -50,11 +55,32 @@ class AuthController(BaseController):
         # 4. Execute
         self.run_async(db_task, on_complete)
 
-    # --- Registration Logic ---
+    # -------------------------------------------------------------------------
+    # Registration Logic 
+    # -------------------------------------------------------------------------
     def register(self, user_data, profile_data, role):
-        # 1. Validation
+        """
+        Handles user registration.
+        user_data: dict {username, password, name, email, gender}
+        profile_data: dict {major, year} OR {department}
+        role: str
+        """
+
+        # 1. Validation & Sanitization
         if not user_data.get('username') or not user_data.get('password'):
             self.show_error("Validation Error", "Username and Password are required.")
+            return
+        
+        # Ensure role is lowercase for the Model
+        role = role.lower() 
+
+        # Sanitization: Ensure integer fields are actually integers
+        # (Fixes the string-from-UI vs int-in-Model crash)
+        try:
+            if role == 'student' and 'year' in profile_data:
+                profile_data['year'] = int(profile_data['year'])
+        except ValueError:
+            self.show_error("Validation Error", "Year must be a number.")
             return
 
         # 2. Background Task
@@ -63,17 +89,25 @@ class AuthController(BaseController):
             return service.register(user_data, profile_data, role)
 
         # 3. Completion Callback
-        def on_complete(new_user):
-            if new_user:
-                self.show_success("Success", "Account created successfully! Please login.")
-                self.navigate("login") # Go back to login screen
+        def on_complete(result):
+            
+            
+            # Assuming run_async handles exceptions, if we get here, it succeeded.
+            self.show_success("Success", "Account created successfully! Please login.")
+            self.navigate("login")
 
         # 4. Execute
         self.run_async(db_task, on_complete)
 
-    # --- Navigation Helpers (These were missing!) ---
+    # -------------------------------------------------------------------------
+    # Navigation Helpers
+    # -------------------------------------------------------------------------
     def go_to_register(self):
         self.navigate("register")
 
     def go_to_login(self):
+        self.navigate("login")
+
+    def logout(self):
+        Session.logout()
         self.navigate("login")

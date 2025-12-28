@@ -9,22 +9,24 @@ class AnnouncementRepository(BaseRepository):
     Implementation details:
     - Connection Safety: Uses 'with self.get_connection() as conn:' for automatic cleanup.
     - Data Safety: Returns strict 'Announcement' objects via 'from_row', not raw tuples.
-    - Security: Uses parameterized queries (?) to prevent SQL Injection.
+    - Security: Uses parameterized queries (%s) to prevent SQL Injection.
     """
 
     def create(self, item: Announcement) -> Announcement:
         """
         Inserts a new announcement into the database.
         """
-
+        # CHANGED: ? -> %s and added RETURNING id
         sql = """
         INSERT INTO announcements (course_id, title, message, created_at)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
         """
         values = (item.course_id, item.title, item.message, item.created_at)
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, values)
-            item.id = cursor.lastrowid
+            cur = conn.cursor()       # CHANGED: Create cursor
+            cur.execute(sql, values)  # CHANGED: Execute on cursor
+            item.id = cur.fetchone()[0]  # CHANGED: Fetch returned ID
             return item
 
     def get_all(self):
@@ -33,17 +35,20 @@ class AnnouncementRepository(BaseRepository):
         """
         sql = "SELECT * FROM announcements"
         with self.get_connection() as conn:
-            cursor = conn.execute(sql)
-            return [Announcement.from_row(row) for row in cursor.fetchall()]
+            cur = conn.cursor()
+            cur.execute(sql)
+            return [Announcement.from_row(row) for row in cur.fetchall()]
 
     def get_by_id(self, id):
         """
         Fetches a single announcement by unique ID.
         """
-        sql = "SELECT * FROM announcements WHERE id = ?"
+        # CHANGED: ? -> %s
+        sql = "SELECT * FROM announcements WHERE id = %s"
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, (id,))
-            row = cursor.fetchone()
+            cur = conn.cursor()
+            cur.execute(sql, (id,))
+            row = cur.fetchone()
             if row:
                 return Announcement.from_row(row)
             return None
@@ -52,10 +57,12 @@ class AnnouncementRepository(BaseRepository):
         """
         Fetches all announcements belonging to a specific course.
         """
-        sql = "SELECT * FROM announcements WHERE course_id = ?"
+        # CHANGED: ? -> %s
+        sql = "SELECT * FROM announcements WHERE course_id = %s"
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, (course_id,))
-            return [Announcement.from_row(row) for row in cursor.fetchall()]
+            cur = conn.cursor()
+            cur.execute(sql, (course_id,))
+            return [Announcement.from_row(row) for row in cur.fetchall()]
 
     def get_global(self):
         """
@@ -63,27 +70,31 @@ class AnnouncementRepository(BaseRepository):
         """
         sql = "SELECT * FROM announcements WHERE course_id IS NULL"
         with self.get_connection() as conn:
-            cursor = conn.execute(sql)
-            return [Announcement.from_row(row) for row in cursor.fetchall()]
+            cur = conn.cursor()
+            cur.execute(sql)
+            return [Announcement.from_row(row) for row in cur.fetchall()]
 
     def update(self, item: Announcement):
         """
         Updates an existing announcement's details.
         """
-        
+        # CHANGED: ? -> %s
         sql = """
         UPDATE announcements 
-        SET course_id = ?, title = ?, message = ?
-        WHERE id = ?
+        SET course_id = %s, title = %s, message = %s
+        WHERE id = %s
         """
         values = (item.course_id, item.title, item.message, item.id)
         with self.get_connection() as conn:
-            conn.execute(sql, values)
+            cur = conn.cursor()
+            cur.execute(sql, values)
 
     def delete(self, id):
         """
         Hard deletes an announcement by ID.
         """
-        sql = "DELETE FROM announcements WHERE id = ?"
+        # CHANGED: ? -> %s
+        sql = "DELETE FROM announcements WHERE id = %s"
         with self.get_connection() as conn:
-            conn.execute(sql, (id,))
+            cur = conn.cursor()
+            cur.execute(sql, (id,))

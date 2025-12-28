@@ -9,12 +9,10 @@ from services.notification_service import NotificationService
 
 class StudentController(BaseController):
     
-    # --- DASHBOARD & COURSES LOGIC ---
+    # ------------------------------------------------------------------
+    # DASHBOARD LOGIC
+    # ------------------------------------------------------------------
     def load_dashboard_data(self, update_view_callback):
-        """
-        Fetches all summary data for the dashboard view.
-        Aggregates data from multiple services to fill the Dashboard widgets.
-        """
         user = Session.current_user
         if not user: return self.navigate("login")
 
@@ -22,15 +20,13 @@ class StudentController(BaseController):
             student_service = self.get_service(StudentService)
             notification_service = self.get_service(NotificationService)
             
-            # 1. Get Student ID & Profile
-            # Assuming get_student_by_user_id returns the student profile object
+            # 1. Get Student Profile
             student_obj = student_service.get_student_by_user_id(user.id)
             if not student_obj: return {}
 
             student_id = student_obj.student_id
 
-            # 2. Get Stats (Courses, GPA, etc.)
-            # If your service doesn't have these exact methods, return defaults (0 or [])
+            # 2. Get Stats
             try:
                 courses = student_service.get_my_courses(user.id)
                 gpa = student_service.calculate_gpa(student_id) 
@@ -42,7 +38,14 @@ class StudentController(BaseController):
 
             # 3. Get Notifications Count
             notifs = notification_service.get_dashboard_notifications(user.id)
-            unread_count = len([n for n in notifs if n['read_flag'] == 0])
+            
+            # --- FIX: ROBUST ACCESS (Handle Dict or Object) ---
+            unread_count = 0
+            for n in notifs:
+                # Check if it's an object (hasattr) or dict (get)
+                flag = n.read_flag if hasattr(n, 'read_flag') else n.get('read_flag')
+                if flag == 0:
+                    unread_count += 1
 
             return {
                 "student": student_obj.to_dict(),
@@ -59,9 +62,10 @@ class StudentController(BaseController):
         if user:
             self.run_async(lambda: self.get_service(StudentService).get_my_courses(user.id), update_view_callback)
 
-    # --- NOTIFICATIONS LOGIC 
+    # ------------------------------------------------------------------
+    # NOTIFICATIONS LOGIC 
+    # ------------------------------------------------------------------
     def load_notifications(self, callback):
-        """Fetches list of notifications for the Notifications View."""
         user = Session.current_user
         if not user: return
 
@@ -71,12 +75,11 @@ class StudentController(BaseController):
         self.run_async(task, callback)
 
     def mark_notification_read(self, notif_id, callback=None):
-        """Marks a single notification as read."""
         user = Session.current_user
         if not user: return
 
         def task():
-            self.get_service(NotificationService).mark_as_read(user.id, notif_id)
+            self.get_service(NotificationService).mark_as_read(user.id, int(notif_id))
         
         def on_done(_):
             if callback: callback()
@@ -84,24 +87,31 @@ class StudentController(BaseController):
         self.run_async(task, on_done)
 
     def mark_all_notifications_read(self, callback=None):
-        """Marks all notifications as read."""
         user = Session.current_user
         if not user: return
 
         def task():
             service = self.get_service(NotificationService)
-            # Fetch all and loop through them (unless you have a mark_all SQL method)
             all_notifs = service.get_dashboard_notifications(user.id)
+            
             for n in all_notifs:
-                if n['read_flag'] == 0:
-                    service.mark_as_read(user.id, n['notification_id'])
+                # --- FIX: ROBUST ACCESS ---
+                flag = n.read_flag if hasattr(n, 'read_flag') else n.get('read_flag')
+                n_id = n.id if hasattr(n, 'id') else n.get('id')
+                # Note: Some DB queries might return 'notification_id' instead of 'id'
+                if not n_id: n_id = n.get('notification_id')
+
+                if flag == 0 and n_id:
+                    service.mark_as_read(user.id, int(n_id))
 
         def on_done(_):
             if callback: callback()
 
         self.run_async(task, on_done)
 
-    # --- CLASSROOM LOGIC---
+    # ------------------------------------------------------------------
+    # CLASSROOM LOGIC
+    # ------------------------------------------------------------------
     def open_classroom(self, course_id):
         self.navigate("student_classroom", course_id=course_id)
 
@@ -114,20 +124,26 @@ class StudentController(BaseController):
         if not user: return
 
         def fetch_task():
-            # 1. Get Course Info
-            course_service = self.get_service(CourseService)
-            course = course_service.get_course_by_id(course_id)
-            
-            # 2. Get Assignments
-            assign_service = self.get_service(AssignmentService)
-            assignments = assign_service.get_student_assignments(user.id, course_id)
-            
-            # 3. Get Announcements
-            ann_service = self.get_service(AnnouncementService)
-            raw_announcements = ann_service.get_course_announcements(course_id)
+            c_id = int(course_id)
 
-            announcements = [a.to_dict() for a in raw_announcements]
-            announcements.sort(key=lambda x: x['id'], reverse=True)
+            course_service = self.get_service(CourseService)
+            course = course_service.get_course_by_id(c_id)
+            
+            assign_service = self.get_service(AssignmentService)
+            assignments = assign_service.get_student_assignments(user.id, c_id)
+            
+            ann_service = self.get_service(AnnouncementService)
+            raw_announcements = ann_service.get_course_announcements(c_id)
+
+            # Ensure announcements are dicts for the view
+            announcements = []
+            for a in raw_announcements:
+                if hasattr(a, 'to_dict'):
+                    announcements.append(a.to_dict())
+                else:
+                    announcements.append(a)
+
+            announcements.sort(key=lambda x: x.get('id', 0), reverse=True)
             
             return {
                 "course": course,
@@ -137,7 +153,9 @@ class StudentController(BaseController):
 
         self.run_async(fetch_task, update_view_callback)
 
-    # --- ASSIGNMENT DETAILS & SUBMISSION ---
+    # ------------------------------------------------------------------
+    # ASSIGNMENT DETAILS & SUBMISSION
+    # ------------------------------------------------------------------
     def open_assignment_details(self, assignment_id):
         self.navigate("student_assignment_details", assignment_id=assignment_id)
 
@@ -157,7 +175,7 @@ class StudentController(BaseController):
         
         def task():
             service = self.get_service(AssignmentService)
-            return service.get_assignment_detail_for_student(user.id, assignment_id)
+            return service.get_assignment_detail_for_student(user.id, int(assignment_id))
             
         self.run_async(task, callback)
     
@@ -165,13 +183,19 @@ class StudentController(BaseController):
         user = Session.current_user
         if not user: return
         
+        if not content or not content.strip():
+             self.show_error("Error", "Submission content cannot be empty.")
+             return
+
         def task():
             service = self.get_service(AssignmentService)
-            return service.submit_assignment(user.id, assignment_id, content)
+            return service.submit_assignment(user.id, int(assignment_id), content)
             
         self.run_async(task, callback)
     
-    # --- NAVIGATION HELPERS ---
+    # ------------------------------------------------------------------
+    # NAVIGATION HELPERS
+    # ------------------------------------------------------------------
     def navigate_to_assignments(self):
         self.navigate("student_assignments") 
 
@@ -184,7 +208,6 @@ class StudentController(BaseController):
         
         def task():
             service = self.get_service(StudentService)
-            # Ensure this method exists in your StudentService
             return service.get_grades(user.id) 
             
         self.run_async(task, update_view_callback)
@@ -195,7 +218,9 @@ class StudentController(BaseController):
     def navigate_to_catalog(self):
         self.navigate("student_catalog")
     
-    # --- CATALOG & ENROLLMENT ---
+    # ------------------------------------------------------------------
+    # CATALOG & ENROLLMENT
+    # ------------------------------------------------------------------
     def load_catalog_data(self, update_view_callback, query=None):
         user = Session.current_user
         if not user: return
@@ -209,7 +234,13 @@ class StudentController(BaseController):
             
             student_service = self.get_service(StudentService)
             my_courses = student_service.get_my_courses(user.id)
-            enrolled_ids = [mc['id'] for mc in my_courses] if my_courses else []
+            
+            # Handle both object and dict return types for courses
+            enrolled_ids = []
+            if my_courses:
+                for mc in my_courses:
+                    c_id = mc.id if hasattr(mc, 'id') else mc.get('id')
+                    enrolled_ids.append(c_id)
             
             return {
                 "courses": courses,
@@ -224,7 +255,7 @@ class StudentController(BaseController):
 
         def task():
             service = self.get_service(StudentService)
-            return service.enroll_course(user.id, course_id)
+            return service.enroll_course(user.id, int(course_id))
 
         self.run_async(task, callback)
     
@@ -234,6 +265,6 @@ class StudentController(BaseController):
 
         def task():
             service = self.get_service(StudentService)
-            return service.drop_course(user.id, course_id)
+            return service.drop_course(user.id, int(course_id))
 
         self.run_async(task, callback)

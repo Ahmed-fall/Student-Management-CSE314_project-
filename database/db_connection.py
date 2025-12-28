@@ -1,34 +1,47 @@
-import sqlite3
 import os
 from contextlib import contextmanager
+import psycopg2
+from psycopg2 import pool
+from psycopg2.extras import DictCursor 
+from dotenv import load_dotenv
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, '..', 'student_management.db')
+load_dotenv()
+
+# Global threaded pool (safe for your async threads)
+connection_pool = None
+
+def init_connection_pool():
+    global connection_pool
+    try:
+        dsn = os.getenv("DATABASE_URL")
+        if not dsn:
+            raise ValueError("DATABASE_URL not set in .env")
+        connection_pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=1,          # Min connections
+            maxconn=10,         # Max (free tier safe)
+            dsn=dsn,
+            cursor_factory=DictCursor
+        )
+        print("PostgreSQL pool initialized")
+    except Exception as e:
+        print(f"Pool init error: {e}")
+        raise
 
 @contextmanager
 def get_db_connection():
-    
     conn = None
-
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.row_factory = sqlite3.Row
-        
+        if connection_pool is None:
+            raise ValueError("Connection pool not initialized")
+        conn = connection_pool.getconn()
+        conn.autocommit = False  # Transactions
         yield conn
         conn.commit()
-    
-    except sqlite3.Error as e:
-        
-        if conn:
-            conn.rollback()
-        print(f" Database Error: {e}") 
-        raise e
-
     except Exception as e:
         if conn:
             conn.rollback()
-        raise e 
+        print(f"DB error: {e}")
+        raise
     finally:
         if conn:
-            conn.close()
+            connection_pool.putconn(conn)

@@ -6,3 +6,5 @@ test.py
 .venv/
 venv/
 .DS_Store
+echo ".env"
+.env

@@ -3,94 +3,73 @@ from core.base_model import BaseModel
 class Grade(BaseModel):
     """
     Represents a Grade entity for a Submission.
-    
-    Strict OOP Implementation:
-    - Inheritance: Inherits from BaseModel.
-    - Encapsulation: All attributes are private (_var) with public properties.
-    - Validation: Setters enforce type and value constraints immediately.
     """
 
     def __init__(self, id: int, submission_id: int, grade_value: float, feedback: str):
-        """
-        Initialize and VALIDATE all data immediately.
-        We use self.variable = value (the setter) instead of self._variable = value
-        to ensure validation logic runs during object creation.
-        """
         # 1. IDs 
         self.id = id
         self.submission_id = submission_id
 
         # 2. Grading Data 
-        self.grade_value = grade_value  # Must be a number >= 0
-        self.feedback = feedback        # Can be empty, sanitized to string
+        self.grade_value = grade_value  
+        self.feedback = feedback        
 
     # ---------------------------------------------------------
-    # Getters (@property) - Explicitly exposing private data
+    # Getters
     # ---------------------------------------------------------
+    @property
+    def id(self): return self._id
 
     @property
-    def id(self):
-        return self._id
+    def submission_id(self): return self._submission_id
 
     @property
-    def submission_id(self):
-        return self._submission_id
+    def grade_value(self): return self._grade_value
 
     @property
-    def grade_value(self):
-        return self._grade_value
-
-    @property
-    def feedback(self):
-        return self._feedback
+    def feedback(self): return self._feedback
 
     # ---------------------------------------------------------
-    # Setters (Validation Logic) - The Guard Rails
+    # Setters
     # ---------------------------------------------------------
-
     @id.setter
     def id(self, value):
         if value is not None and not isinstance(value, int):
-            raise TypeError(f"Grade ID must be an integer, got {type(value).__name__}")
+            raise TypeError("Grade ID must be an integer.")
         self._id = value
 
     @submission_id.setter
     def submission_id(self, value):
         if not isinstance(value, int):
-            raise TypeError(f"Submission ID must be an integer, got {type(value).__name__}")
+            raise TypeError("Submission ID must be an integer.")
         self._submission_id = value
 
     @grade_value.setter
     def grade_value(self, value):
-        # Allow int or float
-        if not isinstance(value, (int, float)):
-            raise TypeError(f"Grade value must be a number (int or float), got {type(value).__name__}")
+        """
+        FIX: Handles int, float, and PostgreSQL Decimal types by converting to float.
+        """
+        try:
+            val = float(value)
+        except (ValueError, TypeError):
+             raise TypeError(f"Grade value must be a number, got {type(value).__name__}")
         
-        # Check constraints
-        if value < 0:
+        if val < 0:
             raise ValueError("Grade value cannot be negative.")
         
-        self._grade_value = float(value)
+        self._grade_value = val
 
     @feedback.setter
     def feedback(self, value):
-        # Sanitization: Convert None to empty string to prevent UI errors
         if value is None:
             self._feedback = ""
-        elif not isinstance(value, str):
-             
-             raise TypeError("Feedback must be a string.")
         else:
-            self._feedback = value.strip()
+            self._feedback = str(value).strip()
 
     # ---------------------------------------------------------
-    # Polymorphism (Required by BaseModel)
+    # Conversion
     # ---------------------------------------------------------
     def to_dict(self):
-        """
-        Converts the object to a dictionary for the UI.
-        Matches the database column names exactly.
-        """
         return {
             "id": self._id,
             "submission_id": self._submission_id,
@@ -100,11 +79,7 @@ class Grade(BaseModel):
 
     @staticmethod
     def from_row(row):
-        """
-        Factory method to create a Grade from a database row.
-        """
-        if not row:
-            return None
+        if not row: return None
         return Grade(
             id=row['id'],
             submission_id=row['submission_id'],

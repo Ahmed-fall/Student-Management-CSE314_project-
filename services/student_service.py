@@ -35,31 +35,21 @@ class StudentService(BaseService):
 
     # --- HELPER ---
     def _get_student_profile_id(self, user_id: int) -> int | None:
-        """
-        Helper to resolve student profile ID from user ID using the Repository.
-        """
-        # We use the method from your StudentRepository to ensure consistency
         return self.student_repo.get_profile_id_by_user_id(user_id)
 
     # =========================================================
-    #  1. CORE PROFILE METHODS (THE FIX IS HERE)
+    #  1. CORE PROFILE METHODS
     # =========================================================
     def get_student_by_user_id(self, user_id):
-        """
-        Returns the full Student model for a given User ID.
-        INCLUDES A PATCH to prevent 'no attribute student_id' errors.
-        """
         student = self.student_repo.get_by_id(user_id)
         
         if student:
-            
             if not hasattr(student, 'student_id'):
                 student.student_id = student.student_profile_id
                 
         return student
 
     def get_students_by_course(self, course_id: int):
-        """Fetches the list of students for the instructor's popup."""
         try:
             return self.student_repo.get_students_by_course(course_id)
         except Exception as e:
@@ -114,14 +104,18 @@ class StudentService(BaseService):
             results = []
             for c in courses:
                 d = c.to_dict() if hasattr(c, 'to_dict') else vars(c)
-                # Fetch instructor name manually
+                
+                # Manual Instructor Fetch using PostgreSQL placeholder %s
                 with self.course_repo.get_connection() as conn:
-                    res = conn.execute("""
+                    cur = conn.cursor()
+                    cur.execute("""
                         SELECT u.name FROM instructors i 
                         JOIN users u ON i.user_id = u.id 
-                        WHERE i.id = ?
-                    """, (c.instructor_id,)).fetchone()
+                        WHERE i.id = %s
+                    """, (c.instructor_id,))
+                    res = cur.fetchone()
                     d['instructor_name'] = res[0] if res else "Unknown"
+                
                 results.append(d)
             return results
         except Exception as e:
@@ -131,11 +125,9 @@ class StudentService(BaseService):
     #  3. GRADES & TRANSCRIPT
     # =========================================================
     def get_grades(self, user_id):
-        """Alias for get_student_grades to match Controller calls."""
         return self.get_student_grades(user_id)
 
     def get_student_grades(self, user_id):
-        """Fetches all submissions and combines them with assignment details."""
         student_profile_id = self._get_student_profile_id(user_id)
         if not student_profile_id: return []
 
@@ -156,7 +148,6 @@ class StudentService(BaseService):
         return results
 
     def get_transcript(self, user_id):
-        """Returns formatted transcript data for GPA calculation."""
         try:
             student_profile_id = self._get_student_profile_id(user_id)
             if not student_profile_id: return []
@@ -177,10 +168,9 @@ class StudentService(BaseService):
             self.handle_db_error(e)
 
     # =========================================================
-    #  4. DASHBOARD CALCULATIONS (Broken down for Controller)
+    #  4. DASHBOARD CALCULATIONS
     # =========================================================
     def calculate_gpa(self, student_profile_id):
-        """Calculates GPA for the given student profile ID."""
         raw_data = self.grade_repo.get_transcript_data(student_profile_id)
         if not raw_data: return 0.0
 
@@ -195,12 +185,9 @@ class StudentService(BaseService):
         return round(total_weighted / total_credits, 2) if total_credits > 0 else 0.0
 
     def get_upcoming_deadlines(self, student_profile_id):
-        """Fetches upcoming assignments for the student."""
-        # 1. Get active courses
         enrollments = self.enrollment_repo.get_by_student_id(student_profile_id)
         active_ids = [e.course_id for e in enrollments if e.status == 'enrolled']
         
-        # 2. Get submitted assignments to exclude them
         subs = self.submission_repo.get_by_student_id(student_profile_id)
         submitted_ids = {s.assignment_id for s in subs}
         
@@ -231,13 +218,10 @@ class StudentService(BaseService):
         return sorted(upcoming, key=lambda x: x['due_date'])
 
     def get_dashboard_overview(self, user_id: int):
-        """Aggregator that uses the smaller methods above."""
         try:
-            # We use our own method that includes the 'student_id' patch
             student = self.get_student_by_user_id(user_id)
             if not student: return {}
             
-            # Use the CORRECT attribute from the model
             pid = student.student_profile_id
             
             return {

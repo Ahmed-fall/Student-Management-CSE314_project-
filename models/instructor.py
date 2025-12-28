@@ -1,4 +1,4 @@
-from .user import User 
+from models.user import User  # Fixed: Use absolute import
 
 class Instructor(User):
     """
@@ -7,12 +7,13 @@ class Instructor(User):
     """
     
     def __init__(self, id, username, name, email, gender, role, password_hash, department,
-                 instructor_profile_id=None, user_id_fk=None):
+                 instructor_profile_id=None, user_id_fk=None, created_at=None):
         
         # 1. Inheritance: Call the parent User constructor
-        super().__init__(id, username, name, email, gender, role, password_hash)
+        # We pass 'created_at' so the parent User class can handle the datetime fix
+        super().__init__(id, username, name, email, gender, role, password_hash, created_at)
         
-        # 2. Instructor-specific profile attributes (Validation enforced by setters)
+        # 2. Instructor-specific profile attributes
         self.instructor_profile_id = instructor_profile_id 
         self.user_id_fk = user_id_fk                 
         self.department = department
@@ -52,14 +53,14 @@ class Instructor(User):
         self._department = value.strip()
 
     # ---------------------------------------------------------
-    # Polymorphism & Abstraction (Overrides and Required Methods)
+    # Polymorphism & Abstraction
     # ---------------------------------------------------------
-
-
 
     def to_dict(self):
         """REQUIRED: Combines User data and Instructor data for UI display."""
+        # Get base user data first
         data = super().to_dict()
+        # Merge instructor specific data
         data.update({
             'instructor_profile_id': self.instructor_profile_id,
             'department': self.department
@@ -83,6 +84,8 @@ class Instructor(User):
             gender=row['gender'], 
             role=row['role'], 
             password_hash=row['password'],
+            created_at=row.get('created_at'), # Pass safely
+            
             # Instructor Data
             department=row['department'],
             instructor_profile_id=row['instructor_profile_id'], 

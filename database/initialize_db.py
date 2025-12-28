@@ -1,142 +1,145 @@
-import sqlite3
 import os
+import psycopg2
+from dotenv import load_dotenv
+
+# 1. Load environment variables
+load_dotenv()
 
 def create_tables():
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    DB_PATH = os.path.join(BASE_DIR, '..', 'student_management.db')
+    # 2. Get the URL from .env (just like your pool does)
+    database_url = os.getenv("DATABASE_URL")
     
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    print("Checking database tables...")
+    if not database_url:
+        print("Error: DATABASE_URL not found in .env file.")
+        return
 
-    # --- TEAM MEMBER 4 (AUTH): USERS TABLE ---
+    try:
+        # 3. Connect using the URL string
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        print("Connected to PostgreSQL. Checking tables...")
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        gender TEXT,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL -- "student", "instructor", "admin"
-    );
-    """)
+        # --- 1. USERS ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(50) NOT NULL UNIQUE,
+            name VARCHAR(100) NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            gender VARCHAR(20),
+            password TEXT NOT NULL,
+            role VARCHAR(20) NOT NULL CHECK (role IN ('student', 'instructor', 'admin'))
+        );
+        """)
 
-    # --- TEAM MEMBER 1: STUDENTS ---
+        # --- 2. STUDENTS ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            level INTEGER,
+            birthdate DATE,
+            major VARCHAR(100)
+        );
+        """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS students (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        level INTEGER,
-        birthdate TEXT,
-        major TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    """)
+        # --- 3. INSTRUCTORS ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS instructors (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            department VARCHAR(100)
+        );
+        """)
 
-    # --- TEAM MEMBER 2: INSTRUCTORS ---
-    # Paste your schema here...
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS instructors (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        department TEXT ,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    """)
-    # --- TEAM MEMBER 3: COURSES --- 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS courses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        code TEXT NOT NULL UNIQUE,
-        name TEXT NOT NULL,
-        description TEXT,
-        credits INTEGER NOT NULL DEFAULT 3,
-        semester TEXT NOT NULL,
-        max_students INTEGER NOT NULL DEFAULT 30,
-        instructor_id INTEGER,
-        FOREIGN KEY (instructor_id) REFERENCES instructors(id)
-    );
-    """)
-    
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS enrollments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id INTEGER NOT NULL,
-        course_id INTEGER NOT NULL,
-        date_enrolled TEXT,
-        status TEXT NOT NULL DEFAULT 'enrolled',
-        FOREIGN KEY (student_id) REFERENCES students(id),
-        FOREIGN KEY (course_id) REFERENCES courses(id)
-    );
-    """)
+        # --- 4. COURSES ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS courses (
+            id SERIAL PRIMARY KEY,
+            code VARCHAR(20) NOT NULL UNIQUE,
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            credits INTEGER NOT NULL DEFAULT 3,
+            semester VARCHAR(20) NOT NULL,
+            max_students INTEGER NOT NULL DEFAULT 30,
+            instructor_id INTEGER REFERENCES instructors(id) ON DELETE SET NULL
+        );
+        """)
 
-    # --- TEAM MEMBER 5: ASSIGNMENTS ---
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS assignments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        course_id INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT,
-        type TEXT NOT NULL, -- "quiz" or "project"
-        due_date TEXT,
-        max_score INTEGER NOT NULL DEFAULT 100,
-        FOREIGN KEY (course_id) REFERENCES courses(id)
-    );
-    """)
+        # --- 5. ENROLLMENTS ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS enrollments (
+            id SERIAL PRIMARY KEY,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+            date_enrolled TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(20) NOT NULL DEFAULT 'enrolled'
+        );
+        """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS submissions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        assignment_id INTEGER NOT NULL,
-        student_id INTEGER NOT NULL,
-        content TEXT,
-        submitted_at TEXT,
-        FOREIGN KEY (assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
-        FOREIGN KEY (student_id) REFERENCES students(id)
-    );
-    """)
+        # --- 6. ASSIGNMENTS ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS assignments (
+            id SERIAL PRIMARY KEY,
+            course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+            title VARCHAR(200) NOT NULL,
+            description TEXT,
+            type VARCHAR(20) NOT NULL,
+            due_date TIMESTAMP,
+            max_score INTEGER NOT NULL DEFAULT 100
+        );
+        """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS grades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        submission_id INTEGER NOT NULL,
-        grade_value REAL NOT NULL,
-        feedback TEXT,
-        FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE
-    );
-    """)
+        # --- 7. SUBMISSIONS ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS submissions (
+            id SERIAL PRIMARY KEY,
+            assignment_id INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            content TEXT,
+            submitted_at TIMESTAMP
+        );
+        """)
 
-    # --- TEAM MEMBER 6: ANNOUNCEMENTS ---
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS announcements (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        course_id INTEGER, -- NULL means global announcement
-        title TEXT NOT NULL,
-        message TEXT NOT NULL,
-        created_at TEXT,
-        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
-    );
-    """)
+        # --- 8. GRADES ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS grades (
+            id SERIAL PRIMARY KEY,
+            submission_id INTEGER NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+            grade_value DECIMAL(5, 2) NOT NULL,
+            feedback TEXT
+        );
+        """)
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS notifications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        announcement_id INTEGER NOT NULL,
-        read_flag INTEGER DEFAULT 0,
-        sent_at TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE
-    );
-    """)
+        # --- 9. ANNOUNCEMENTS ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS announcements (
+            id SERIAL PRIMARY KEY,
+            course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+            title VARCHAR(200) NOT NULL,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
 
-    conn.commit()
-    conn.close()
-    print("Database initialized successfully!")
+        # --- 10. NOTIFICATIONS ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            announcement_id INTEGER NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+            read_flag INTEGER DEFAULT 0,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("Database initialized successfully using .env config!")
+
+    except Exception as e:
+        print(f"Error initializing database: {e}")
 
 if __name__ == "__main__":
     create_tables()

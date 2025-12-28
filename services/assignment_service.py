@@ -7,12 +7,7 @@ from repositories.notification_repo import NotificationRepository
 from repositories.announcement_repo import AnnouncementRepository
 from datetime import datetime
 from core.base_service import BaseService
-
 from services.notification_service import NotificationService
-
-from database.db_connection import get_db_connection
-
-# Models
 from models.assignment import Assignment
 from models.submission import Submission
 from models.grade import Grade
@@ -20,11 +15,6 @@ from models.notification import Notification
 from models.announcement import Announcement
 
 class AssignmentService(BaseService):
-    """
-    Central module for managing the Assignment Lifecycle:
-    Creation -> Notification -> Submission -> Grading -> Status Tracking
-    """
-
     def __init__(self):
         self.assignment_repo = AssignmentRepository()
         self.submission_repo = SubmissionRepository()
@@ -36,15 +26,47 @@ class AssignmentService(BaseService):
 
     def _get_student_profile_id(self, user_id: int) -> int | None:
         with self.enrollment_repo.get_connection() as conn:
-            res = conn.execute("SELECT id FROM students WHERE user_id = ?", (user_id,)).fetchone()
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM students WHERE user_id = %s", (user_id,))
+            res = cur.fetchone()
             return res[0] if res else None
 
-# ---------------------------------------------------------
-    # 1. INSTRUCTOR: Create Assignment (With Auto-Announcement)
-    # ---------------------------------------------------------
+    # --- HELPER: Recalculate Course Grade for GPA ---
+    def _recalculate_course_grade(self, student_id: int, course_id: int):
+        """
+        Calculates the average of all graded assignments for a specific student/course
+        and updates the 'enrollments' table so the GPA service can read it.
+        """
+        try:
+            with self.grade_repo.get_connection() as conn:
+                with conn.cursor() as cur:
+                    # 1. Calculate Average
+                    # Joins Grades -> Submissions -> Assignments to ensure we only average this course's work
+                    sql_avg = """
+                        SELECT AVG(g.grade_value)
+                        FROM grades g
+                        JOIN submissions s ON g.submission_id = s.id
+                        JOIN assignments a ON s.assignment_id = a.id
+                        WHERE s.student_id = %s AND a.course_id = %s
+                    """
+                    cur.execute(sql_avg, (student_id, course_id))
+                    result = cur.fetchone()
+                    new_average = result[0] if result and result[0] is not None else 0.0
+
+                    # 2. Update Enrollment Table
+                    sql_update = """
+                        UPDATE enrollments 
+                        SET current_grade = %s 
+                        WHERE student_id = %s AND course_id = %s
+                    """
+                    cur.execute(sql_update, (new_average, student_id, course_id))
+                    conn.commit()
+        except Exception as e:
+            # Log error but don't crash the grading process
+            print(f"Error recalculating course grade: {e}")
+
     def create_assignment(self, instructor_id: int, course_id: int, title: str, description: str, type: str, due_date: str, max_score: int = 100):
         try:
-            # 1. Validation
             course = self.course_repo.get_by_id(course_id)
             if not course: raise ValueError("Course not found.")
             self.check_permission(course.instructor_id, instructor_id)
@@ -52,11 +74,9 @@ class AssignmentService(BaseService):
             if datetime.fromisoformat(due_date) < datetime.now():
                 raise ValueError("Due date must be in the future.")
 
-            # 2. Create Assignment
             assignment = Assignment(None, course_id, title, description, type, due_date, max_score)
             saved_assignment = self.assignment_repo.create(assignment)
 
-            # 3.Create System Announcement 
             sys_announcement = Announcement(
                 id=None,
                 course_id=course_id,
@@ -66,7 +86,6 @@ class AssignmentService(BaseService):
             )
             saved_ann = self.announcement_repo.create(sys_announcement)
 
-            # 4. Notification Logic
             notification_service = NotificationService()
             notification_service.notify_course(course_id, saved_ann.id)
             
@@ -75,22 +94,13 @@ class AssignmentService(BaseService):
         except Exception as e:
             self.handle_db_error(e)
 
-    # ---------------------------------------------------------
-    # 2. GENERAL: View Assignments
-    # ---------------------------------------------------------
     def get_assignments_by_course(self, course_id: int):
-        """
-        Fetches all assignments for a specific course.
-        """
         try:
             return self.assignment_repo.get_by_course_id(course_id)
         except Exception as e:
             self.handle_db_error(e)
             return []
 
-    # ---------------------------------------------------------
-    # 3. STUDENT UI: Get Status List (Critical for UI)
-    # ---------------------------------------------------------
     def get_student_assignments(self, user_id: int, course_id: int = None):
         try:
             student_profile_id = self._get_student_profile_id(user_id)
@@ -102,14 +112,12 @@ class AssignmentService(BaseService):
             courses_map = {}
 
             if course_id:
-                # Single course mode
                 if not self.enrollment_repo.is_enrolled(user_id, course_id):
                     raise PermissionError("Not enrolled in this course.")
                 courses_map[course_id] = self.course_repo.get_by_id(course_id)
                 assignments = self.assignment_repo.get_by_course_id(course_id)
                 submissions = self.submission_repo.get_by_student_and_course(student_profile_id, course_id)
             else:
-                # All courses mode
                 enrollments = self.enrollment_repo.get_by_student_id(student_profile_id)
                 course_ids = [e.course_id for e in enrollments if e.status == 'enrolled']
                 if not course_ids:
@@ -124,7 +132,7 @@ class AssignmentService(BaseService):
 
             for asm in assignments:
                 if asm.course_id not in courses_map:
-                    continue  # Skip if course not loaded (edge case)
+                    continue
                 
                 status = "Pending"
                 submission = submission_map.get(asm.id)
@@ -146,38 +154,29 @@ class AssignmentService(BaseService):
 
                 results.append(asm_data)
 
-            # Sort by due date
             results.sort(key=lambda x: x['due_date'])
             return results
 
         except Exception as e:
             self.handle_db_error(e)
 
-    # ---------------------------------------------------------
-    # 4. STUDENT: Submit Assignment
-    # ---------------------------------------------------------
     def submit_assignment(self, user_id: int, assignment_id: int, content: str):
         try:
-            # 1. Fetch Assignment to check dates and course
             assignment = self.assignment_repo.get_by_id(assignment_id)
             if not assignment:
                 raise ValueError("Assignment not found.")
 
-            # 2. Security: Check Enrollment
             if not self.enrollment_repo.is_enrolled(user_id, assignment.course_id):
                 raise PermissionError("You are not enrolled in this course.")
             
-            # 3. Get the Student Profile ID for the database record
             student_profile_id = self._get_student_profile_id(user_id)
             if not student_profile_id:
                 raise ValueError("Student profile not found.")
 
-            # 4. Validation: Late Check
             due_date = datetime.fromisoformat(assignment.due_date)
             if datetime.now() > due_date:
                 raise ValueError("Submission Deadline has passed.")
 
-            # 5. Duplicate Check
             existing_sub = self.submission_repo.get_by_student_and_assignment(student_profile_id, assignment_id)
             
             if existing_sub:
@@ -194,30 +193,40 @@ class AssignmentService(BaseService):
                     submitted_at=datetime.now().isoformat()
                 )
                 sub = self.submission_repo.create(new_sub)
+            
+            # Update status to submitted manually to ensure consistency
+            with self.submission_repo.get_connection() as conn:
+                with conn.cursor() as cur:
+                     cur.execute("UPDATE submissions SET status = 'submitted' WHERE id = %s", (sub.id,))
+                     conn.commit()
 
-            # 6. Notify Instructor
+            # Notify Instructor
             course = self.course_repo.get_by_id(assignment.course_id)
+            instructor_user_id = None
+            
             with self.course_repo.get_connection() as conn:
-                res = conn.execute("SELECT user_id FROM instructors WHERE id = ?", (course.instructor_id,)).fetchone()
+                cur = conn.cursor()
+                cur.execute("SELECT user_id FROM instructors WHERE id = %s", (course.instructor_id,))
+                res = cur.fetchone()
                 instructor_user_id = res[0] if res else None
 
             if instructor_user_id:
-                # Create announcement for submission
                 announcement_title = f"New Submission for {assignment.title}"
-                announcement_message = f"A student has submitted the assignment."
-                announcement_created_at = datetime.now().isoformat()
+                announcement_message = "A student has submitted the assignment."
                 
-                with get_db_connection() as conn_ann:
-                    cursor = conn_ann.execute("""
-                        INSERT INTO announcements (course_id, title, message, created_at)
-                        VALUES (?, ?, ?, ?)
-                    """, (assignment.course_id, announcement_title, announcement_message, announcement_created_at))
-                    announcement_id = cursor.lastrowid
+                sys_ann = Announcement(
+                    id=None, 
+                    course_id=assignment.course_id, 
+                    title=announcement_title, 
+                    message=announcement_message, 
+                    created_at=datetime.now().isoformat()
+                )
+                saved_ann = self.announcement_repo.create(sys_ann)
 
                 notification = Notification(
                     id=None,
                     user_id=instructor_user_id,
-                    announcement_id=announcement_id,
+                    announcement_id=saved_ann.id,
                     read_flag=0,
                     sent_at=datetime.now().isoformat()
                 )
@@ -228,20 +237,14 @@ class AssignmentService(BaseService):
         except Exception as e:
             self.handle_db_error(e)
 
-    # ---------------------------------------------------------
-    # 2. INSTRUCTOR: Grade Assignment (With Student Notification)
-    # ---------------------------------------------------------
     def grade_assignment(self, instructor_id: int, submission_id: int, grade_value: float, feedback: str):
         try:
-            # 1. Fetch Context
             submission = self.submission_repo.get_by_id(submission_id)
             if not submission: 
                 raise ValueError("Submission not found.")
             
             assignment = self.assignment_repo.get_by_id(submission.assignment_id)
             
-          
-            # 2.  VALIDATION: Grade Value
             try:
                 val = float(grade_value)
             except ValueError:
@@ -253,7 +256,6 @@ class AssignmentService(BaseService):
             if val > assignment.max_score:
                 raise ValueError(f"Grade {val} exceeds the maximum score of {assignment.max_score}.")
 
-            # 3. Create OR Update Grade
             existing_grade = self.grade_repo.get_by_submission_id(submission_id)
             
             saved_grade = None
@@ -265,14 +267,26 @@ class AssignmentService(BaseService):
                 grade = Grade(None, submission_id, val, feedback)
                 saved_grade = self.grade_repo.create(grade)
 
-            # 4. Notification Logic
+            # --- FIX 1: UPDATE STATUS ---
+            # Explicitly mark submission as 'graded' so it disappears from Pending list
+            with self.submission_repo.get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE submissions SET status = 'graded' WHERE id = %s", (submission_id,))
+                    conn.commit()
+
+            # --- FIX 2: RECALCULATE COURSE GRADE (GPA) ---
+            # Update the student's average in enrollments table
+            self._recalculate_course_grade(submission.student_id, assignment.course_id)
+
+            # Notifications
             student_user_id = None
             with self.enrollment_repo.get_connection() as conn:
-                res = conn.execute("SELECT user_id FROM students WHERE id = ?", (submission.student_id,)).fetchone()
+                cur = conn.cursor()
+                cur.execute("SELECT user_id FROM students WHERE id = %s", (submission.student_id,))
+                res = cur.fetchone()
                 student_user_id = res[0] if res else None
 
             if student_user_id:
-                # A. Create a backend announcement to link the notification to
                 ann_title = f"Grade Posted: {assignment.title}"
                 ann_message = f"You received a score of {val}/{assignment.max_score}."
                 
@@ -285,7 +299,6 @@ class AssignmentService(BaseService):
                 )
                 saved_ann = self.announcement_repo.create(sys_announcement)
 
-                # B. Create the Notification for the specific student
                 notification = Notification(
                     id=None,
                     user_id=student_user_id,
@@ -298,26 +311,19 @@ class AssignmentService(BaseService):
             return saved_grade
 
         except ValueError as ve:
-            # Re-raise value errors so the Controller can show the specific message
             raise ve
         except Exception as e:
             self.handle_db_error(e)
 
-    # ---------------------------------------------------------
-    # 6. INSTRUCTOR: Delete Assignment
-    # ---------------------------------------------------------
     def delete_assignment(self, instructor_id: int, assignment_id: int):
         try:
-            # 1. Fetch Assignment
             asm = self.assignment_repo.get_by_id(assignment_id)
             if not asm:
                 raise ValueError("Assignment not found.")
             
-            # 2. Fetch Course to verify ownership
             course = self.course_repo.get_by_id(asm.course_id)
             self.check_permission(course.instructor_id, instructor_id)
 
-            # 3. Delete
             self.assignment_repo.delete(assignment_id)
             return True
 
@@ -325,30 +331,21 @@ class AssignmentService(BaseService):
             self.handle_db_error(e)
 
     def get_assignment_detail_for_student(self, user_id: int, assignment_id: int):
-        """
-        Fetches the assignment details AND the student's current submission (if any).
-        Returns a dictionary for the View.
-        """
         try:
-            # 1. Fetch Assignment
             assignment = self.assignment_repo.get_by_id(assignment_id)
             if not assignment:
                 return None
 
-            # 2. Resolve Student Profile ID
             student_profile_id = self._get_student_profile_id(user_id)
 
-            # 3. Fetch Submission (if student exists)
             submission = None
             if student_profile_id:
                 submission = self.submission_repo.get_by_student_and_assignment(student_profile_id, assignment_id)
             
             grade = None
             if submission:
-                # Add this line to fetch the grade!
                 grade = self.grade_repo.get_by_submission_id(submission.id)
 
-            # 4. Return the Dictionary the View expects
             return {
                 "assignment": assignment,
                 "submission": submission,

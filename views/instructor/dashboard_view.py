@@ -124,7 +124,6 @@ class InstructorDashboardView(BaseView):
 
         self._create_stat_card("Total Students", stats['students'], "#E3F2FD", "#1565C0") # Blue
         self._create_stat_card("Active Courses", stats['courses'], "#E8F5E9", "#2E7D32")  # Green
-        self._create_stat_card("Pending Grading", stats['pending_grades'], "#FFF3E0", "#EF6C00") # Orange
 
         # 3. Render Course Cards
         for widget in self.course_list_container.winfo_children(): widget.destroy()

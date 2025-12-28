@@ -2,12 +2,16 @@ import os
 import sys
 import tkinter as tk
 
+from dotenv import load_dotenv
+load_dotenv()  # Add this right after imports
+
 if getattr(sys, 'frozen', False):
     application_path = os.path.dirname(sys.executable)
     os.chdir(application_path)  
 else:
     application_path = os.path.dirname(os.path.abspath(__file__))
 
+from database.db_connection import init_connection_pool
 from database.initialize_db import create_tables
 from services.instructor_service import InstructorService
 from services.user_service import UserService
@@ -45,6 +49,7 @@ def main():
     
     # 1. Infrastructure
     create_tables()
+    init_connection_pool()
     bootstrap_services() 
     
     # 2. UI Init

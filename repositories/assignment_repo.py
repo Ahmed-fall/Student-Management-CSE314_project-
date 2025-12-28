@@ -4,11 +4,6 @@ from models.assignment import Assignment
 class AssignmentRepository(BaseRepository):
     """
     Handles strict Database interactions for the 'assignments' table.
-    
-    Implementation details:
-    - Connection Safety: Uses 'with self.get_connection() as conn:' for automatic cleanup.
-    -Data Safety: Returns strict 'Assignment' objects via 'from_row', not raw tuples.
-    - Security: Uses parameterized queries (?) to prevent SQL Injection.
     """
 
     def create(self, item: Assignment) -> Assignment:
@@ -17,13 +12,15 @@ class AssignmentRepository(BaseRepository):
         """
         sql = """
         INSERT INTO assignments (course_id, title, description, type, due_date, max_score)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id
         """
-        # We extract values from the Validated Object, not raw arguments
         values = (item.course_id, item.title, item.description, item.type, item.due_date, item.max_score)
+        
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, values)
-            item.id = cursor.lastrowid
+            cur = conn.cursor()          
+            cur.execute(sql, values)     
+            item.id = cur.fetchone()[0]  
             return item
 
     def get_all(self):
@@ -32,26 +29,32 @@ class AssignmentRepository(BaseRepository):
         """
         sql = "SELECT * FROM assignments"
         with self.get_connection() as conn:
-            cursor = conn.execute(sql)
-            return [Assignment.from_row(row) for row in cursor.fetchall()]
+            cur = conn.cursor()
+            cur.execute(sql)
+            return [Assignment.from_row(row) for row in cur.fetchall()]
 
     def get_by_id(self, id: int):
         """
         Fetches a single assignment by unique ID.
         """
-        sql = "SELECT * FROM assignments WHERE id = ?"
+        sql = "SELECT * FROM assignments WHERE id = %s"
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, (id,))
-            return Assignment.from_row(cursor.fetchone())
+            cur = conn.cursor()
+            cur.execute(sql, (id,))
+            row = cur.fetchone()
+            if row:
+                return Assignment.from_row(row)
+            return None
 
     def get_by_course_id(self, course_id: int):
         """
         Fetches all assignments belonging to a specific course.
         """
-        sql = "SELECT * FROM assignments WHERE course_id = ? ORDER BY due_date ASC"
+        sql = "SELECT * FROM assignments WHERE course_id = %s ORDER BY due_date ASC"
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, (course_id,))
-            return [Assignment.from_row(row) for row in cursor.fetchall()]
+            cur = conn.cursor()
+            cur.execute(sql, (course_id,))
+            return [Assignment.from_row(row) for row in cur.fetchall()]
 
     def update(self, item: Assignment):
         """
@@ -59,29 +62,31 @@ class AssignmentRepository(BaseRepository):
         """
         sql = """
         UPDATE assignments 
-        SET title = ?, description = ?, type = ?, due_date = ?, max_score = ?
-        WHERE id = ?
+        SET title = %s, description = %s, type = %s, due_date = %s, max_score = %s
+        WHERE id = %s
         """
         values = (item.title, item.description, item.type, item.due_date, item.max_score, item.id)
         with self.get_connection() as conn:
-            conn.execute(sql, values)
+            cur = conn.cursor()
+            cur.execute(sql, values)
 
     def delete(self, id: int):
         """
         Hard deletes an assignment by ID.
         """
-        sql = "DELETE FROM assignments WHERE id = ?"
+        sql = "DELETE FROM assignments WHERE id = %s"
         with self.get_connection() as conn:
-            conn.execute(sql, (id,))
+            cur = conn.cursor()
+            cur.execute(sql, (id,))
     
     def get_course_max_score(self, course_id: int) -> float:
         """
         Calculates the total possible points for a course (Sum of all assignments).
         """
-        sql = "SELECT SUM(max_score) FROM assignments WHERE course_id = ?"
+        sql = "SELECT SUM(max_score) FROM assignments WHERE course_id = %s"
         
         with self.get_connection() as conn:
-            cursor = conn.execute(sql, (course_id,))
-            result = cursor.fetchone()[0]
-            # If result is None (no assignments), return 0.0
+            cur = conn.cursor()
+            cur.execute(sql, (course_id,))
+            result = cur.fetchone()[0]
             return result if result else 0.0

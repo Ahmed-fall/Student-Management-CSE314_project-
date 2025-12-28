@@ -1,17 +1,9 @@
-# models/notification.py
-
 from core.base_model import BaseModel
-import datetime
-
+from datetime import datetime
 
 class Notification(BaseModel):
     """
     Represents a Notification entity.
-
-    Strict OOP Implementation:
-    - Inherits BaseModel
-    - Encapsulation via private attributes
-    - Immediate validation via setters
     """
 
     def __init__(self, id, user_id, announcement_id, read_flag=0, sent_at=None):
@@ -19,33 +11,29 @@ class Notification(BaseModel):
         self.user_id = user_id
         self.announcement_id = announcement_id
         self.read_flag = read_flag
-        self.sent_at = sent_at or datetime.datetime.now().isoformat()
+        # If no date provided, use current time
+        self.sent_at = sent_at or datetime.now()
 
     # -------------------
     # Getters
     # -------------------
     @property
-    def id(self):
-        return self._id
+    def id(self): return self._id
 
     @property
-    def user_id(self):
-        return self._user_id
+    def user_id(self): return self._user_id
 
     @property
-    def announcement_id(self):
-        return self._announcement_id
+    def announcement_id(self): return self._announcement_id
 
     @property
-    def read_flag(self):
-        return self._read_flag
+    def read_flag(self): return self._read_flag
 
     @property
-    def sent_at(self):
-        return self._sent_at
+    def sent_at(self): return self._sent_at
 
     # -------------------
-    # Setters (Validation)
+    # Setters (FIXED VALIDATION)
     # -------------------
     @id.setter
     def id(self, value):
@@ -67,24 +55,30 @@ class Notification(BaseModel):
 
     @read_flag.setter
     def read_flag(self, value):
+        # Allow boolean or 0/1 int
+        if isinstance(value, bool):
+            value = 1 if value else 0
+        
         if value not in (0, 1):
             raise ValueError("read_flag must be 0 (unread) or 1 (read).")
         self._read_flag = value
 
     @sent_at.setter
     def sent_at(self, value):
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("sent_at must be a valid datetime string.")
-        self._sent_at = value.strip()
+        """
+        FIX: Accepts both str (JSON/SQLite) and datetime (PostgreSQL).
+        """
+        if isinstance(value, datetime):
+            self._sent_at = value.isoformat()
+        elif isinstance(value, str) and value.strip():
+            self._sent_at = value.strip()
+        else:
+            raise ValueError(f"sent_at must be a valid datetime object or string. Got {type(value)}")
 
     # -------------------
     # BaseModel Methods
     # -------------------
     def to_dict(self):
-        """
-        Converts the object to a dictionary.
-        Matches database column names exactly.
-        """
         return {
             "id": self._id,
             "user_id": self._user_id,
@@ -95,12 +89,7 @@ class Notification(BaseModel):
 
     @staticmethod
     def from_row(row):
-        """
-        Factory method to create a Notification from a database row.
-        """
-        if row is None:
-            return None
-
+        if row is None: return None
         return Notification(
             id=row["id"],
             user_id=row["user_id"],

@@ -95,7 +95,6 @@ class InstructorGradingView(BaseView):
 
         tk.Label(grade_container, text="Step 3: Grade Work", font=FONTS["h2"], bg="white", fg=COLORS["primary"]).pack(pady=(0,15))
 
-        # [NEW FEATURE] Student Work Display
         tk.Label(grade_container, text="Student's Submitted Work:", bg="white", font=FONTS["small_bold"]).pack(anchor="w")
         
         # Text widget is DISABLED by default so instructor cannot edit student's work accidentally
@@ -190,7 +189,6 @@ class InstructorGradingView(BaseView):
         self.work_display.config(state="normal") # Enable editing to insert text
         self.work_display.delete("1.0", tk.END)
         
-        # 'submission_content' comes from your Repository SQL alias
         content = data.get('submission_content')
         if content:
             self.work_display.insert("1.0", content)

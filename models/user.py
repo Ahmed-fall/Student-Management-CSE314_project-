@@ -1,56 +1,55 @@
-# models/user.py
-from core.base_model import BaseModel 
+from core.base_model import BaseModel
+from datetime import datetime
 
 class User(BaseModel): 
     """
-    Base class for all users, inheriting from BaseModel.
-    Implements Encapsulation using properties/setters and contains base validation.
-    Matches schema: id, username, name, email, gender, password, role.
+    Base class for all users.
+    Parent to Student and Instructor.
     """
     
     ALLOWED_ROLES = {"student", "instructor", "admin"} 
     ALLOWED_GENDERS = {"male", "female", "engineer"} 
     
-    def __init__(self, id, username, name, email, gender, role, password_hash=None):
+    def __init__(self, id, username, name, email, gender, role, password_hash=None, created_at=None):
         self.id = id
-        self._password_hash = password_hash 
         self.username = username
         self.name = name
         self.email = email
         self.gender = gender
         self.role = role
+        
+        # Internal state
+        self._password_hash = password_hash
+        
+        self.created_at = created_at or datetime.now()
 
-    # --- Getters (@property) for Public Access ---
+    # --- Getters ---
     
     @property
-    def id(self):
-        return self._id
+    def id(self): return self._id
 
     @property
-    def username(self):
-        return self._username
+    def username(self): return self._username
 
     @property
-    def name(self):
-        return self._name
+    def name(self): return self._name
 
     @property
-    def email(self):
-        return self._email
+    def email(self): return self._email
 
     @property
-    def gender(self):
-        return self._gender
+    def gender(self): return self._gender
 
     @property
-    def role(self):
-        return self._role
+    def role(self): return self._role
     
     @property
-    def password_hash(self):
-        return self._password_hash 
+    def password_hash(self): return self._password_hash 
 
-    # --- Setters (Validation Logic) ---
+    @property
+    def created_at(self): return self._created_at
+
+    # --- Setters ---
 
     @id.setter
     def id(self, value):
@@ -69,12 +68,9 @@ class User(BaseModel):
 
     @name.setter
     def name(self, value):
-        if not isinstance(value, str):
-            raise TypeError("Name must be a string.")
-        cleaned = value.strip()
-        if not cleaned:
+        if not isinstance(value, str) or not value.strip():
             raise ValueError("Name cannot be empty.")
-        self._name = cleaned
+        self._name = value.strip()
 
     @email.setter
     def email(self, value):
@@ -87,27 +83,41 @@ class User(BaseModel):
 
     @gender.setter
     def gender(self, value):
-        if not isinstance(value, str) or value.lower() not in User.ALLOWED_GENDERS:
-            raise ValueError(f"Invalid gender: {value}. Must be one of {User.ALLOWED_GENDERS}.")
+        if not isinstance(value, str) or value.lower() not in self.ALLOWED_GENDERS:
+            raise ValueError(f"Invalid gender: {value}. Must be {self.ALLOWED_GENDERS}")
         self._gender = value.lower()
 
     @role.setter
     def role(self, value):
-        if not isinstance(value, str) or value.lower() not in User.ALLOWED_ROLES:
-            raise ValueError(f"Invalid role: {value}. Must be one of {User.ALLOWED_ROLES}.")
+        if not isinstance(value, str) or value.lower() not in self.ALLOWED_ROLES:
+            raise ValueError(f"Invalid role: {value}. Must be {self.ALLOWED_ROLES}")
         self._role = value.lower()
 
-    # --- Abstraction (Required by BaseModel) ---
+    @created_at.setter
+    def created_at(self, value):
+        """
+        FIX: Accepts both str and datetime objects.
+        """
+        if isinstance(value, datetime):
+            self._created_at = value.isoformat()
+        elif isinstance(value, str) and value.strip():
+            self._created_at = value.strip()
+        else:
+            # Fallback or strict error - here we assume current time if invalid/None during init
+            self._created_at = datetime.now().isoformat()
+
+    # --- Abstraction ---
 
     def to_dict(self):
-        """Returns dict for UI display with consistent, lowercase keys."""
+        """Returns dict for UI. Password is intentionally excluded for security."""
         return {
             'id': self._id,
             'username': self._username,
             'name': self._name,
             'email': self._email,
             'gender': self._gender,
-            'role': self._role
+            'role': self._role,
+            'created_at': self._created_at
         }
 
     @staticmethod
@@ -123,5 +133,6 @@ class User(BaseModel):
             email=row['email'],
             gender=row['gender'],
             password_hash=row['password'], 
-            role=row['role']
+            role=row['role'],
+            created_at=row.get('created_at') # Pass safely
         )

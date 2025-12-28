@@ -63,9 +63,12 @@ class Student(User):
 
     @birthdate.setter
     def birthdate(self, value):
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError("birthdate cannot be empty.")
-        self._birthdate = value.strip()
+        if isinstance(value, str):
+            cleaned = value.strip()
+            self._birthdate = cleaned if cleaned else None
+            
+        else:
+            self._birthdate = value
 
     @major.setter
     def major(self, value):
