@@ -162,22 +162,11 @@ class InstructorController(BaseController):
             return service.get_unassigned_courses()
         
         self.run_async(task, callback)
-        
     def create_new_course(self, code, name, callback):
         def task():
-            user = Session.current_user
-            if not user:
-                raise ValueError("User not logged in.")
-            
-            # Get the instructor profile ID
-            inst_service = self.get_service(InstructorService)
-            profile = inst_service.get_instructor_profile(user.id)
-            if not profile:
-                raise ValueError("Instructor profile not found.")
-            
-            # Create course with the instructor assigned
             course_svc = self.get_service(CourseService)
-            return course_svc.create_course(instructor_id=profile.instructor_profile_id, code=code, name=name)
+            # Pass None for instructor_id so the course remains 'Unassigned'
+            return course_svc.create_course(instructor_id=None, code=code, name=name)
         self.run_async(task, callback)
 
     def manage_course(self, course_id):
