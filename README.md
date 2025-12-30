@@ -45,7 +45,7 @@ python main.py
 Ensure Python 3 is installed on your system.
 ________________________________________
 📂 Project Structure
-.
+```
 ├── controllers
 │   ├── __init__.py
 │   ├── auth_controller.py
@@ -126,7 +126,9 @@ ________________________________________
         ├── courses_view.py
         ├── dashboard_view.py
         ├── grades_view.py
-        └── notifications_view.py________________________________________
+        └── notifications_view.py
+```
+________________________________________
 👥 Team Members & Contributions
 This project was developed collaboratively, with clear ownership of both role-specific logic and content modules.
 🧑‍💻 People Team
