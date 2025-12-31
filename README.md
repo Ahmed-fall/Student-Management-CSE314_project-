@@ -32,19 +32,29 @@ ________________________________________
 📸 Screenshots
 Login Screen
 ![login](https://github.com/user-attachments/assets/0a4ab134-1fda-4a34-8592-10c2d272f872)
-Student View
+Student Dashboard
 ![student1](https://github.com/user-attachments/assets/3454b44a-c492-4f33-9211-e831f1aa5866)
+Enrolled Courses
 ![student2](https://github.com/user-attachments/assets/615f73c3-711a-4e4a-ac63-7a5a23644d9b)
+Course Catalog
 ![student3](https://github.com/user-attachments/assets/ed7fbc0f-bd3f-4d1c-95d8-abc9c2317563)
+Assignments Tab
 ![student4](https://github.com/user-attachments/assets/c288ff0f-00c2-4022-8bf8-08dd37729fdb)
+Grades and Comments
 ![student5](https://github.com/user-attachments/assets/c1ff0881-2550-4ad6-948c-21ebf8994f06)
+Notifications
 ![student6](https://github.com/user-attachments/assets/52aba9cb-990e-4b0e-9c54-2d9db3f1aeb6)
-Instructor View
+Instructor Dashboard
 ![inst1](https://github.com/user-attachments/assets/1c5e220a-757c-4853-aab9-2cd24f8e3814)
+Assignment Creation and Grading
 ![inst2](https://github.com/user-attachments/assets/8b779ea6-2a16-4f63-8f89-4a56a3901163)
+List of Enrolled Students
 ![inst3](https://github.com/user-attachments/assets/fc7ceedf-3ab0-4fef-a101-b0ac5b50c75f)
+Course Editing
 ![inst4](https://github.com/user-attachments/assets/dc9eb50f-0724-449c-964c-0615ea445222)
+Course Creation
 ![inst5](https://github.com/user-attachments/assets/14f17a23-f5b6-4d4d-a129-7fe66c53513c)
+Announcements Tab
 ![inst6](https://github.com/user-attachments/assets/1bafadbf-979b-4827-8fda-c6493ee041e3)
 ________________________________________
 ⚙️ Installation & Setup
