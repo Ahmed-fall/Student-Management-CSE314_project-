@@ -197,7 +197,3 @@ Through this project, the team gained practical experience in:
 •	Managing relational data using SQLite
 •	Collaborating on a multi-developer software project
 ________________________________________
-✅ Status
-✔ Completed
-✔ Core functionality implemented and stable
-✔ Ready for demonstration and future extension
