@@ -30,6 +30,7 @@ ________________________________________
 •	Programming Paradigm: Object-Oriented Programming (OOP)
 ________________________________________
 📸 Screenshots
+
 Login Screen
 ![login](https://github.com/user-attachments/assets/0a4ab134-1fda-4a34-8592-10c2d272f872)
 Student Dashboard
