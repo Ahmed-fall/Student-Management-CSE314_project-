@@ -60,7 +60,9 @@ Announcements Tab
 ________________________________________
 ⚙️ Installation & Setup
 1.	Clone the repository
-git clone https://github.com/Ahmed-fall/Student-Management-CSE314_project-.git
+        ```
+        git clone https://github.com/Ahmed-fall/Student-Management-CSE314_project-.git
+        ```
 2.	Navigate to the project directory
 cd Student-Management-CSE314_project-
 3.	Run the application
